@@ -1,0 +1,35 @@
+const express = require("express");
+const adminRoutes = require("./adminRoutes");
+const authRoutes = require("./authRoutes");
+const chatRoutes = require("./chatRoutes");
+const favoriteRoutes = require("./favoriteRoutes");
+const housingRequestRoutes = require("./housingRequestRoutes");
+const jobRoutes = require("./jobRoutes");
+const metaRoutes = require("./metaRoutes");
+const notificationRoutes = require("./notificationRoutes");
+const propertyRoutes = require("./propertyRoutes");
+const reportRoutes = require("./reportRoutes");
+const searchRoutes = require("./searchRoutes");
+const uploadRoutes = require("./uploadRoutes");
+const userRoutes = require("./userRoutes");
+const visitRoutes = require("./visitRoutes");
+const workerProfileRoutes = require("./workerProfileRoutes");
+
+const router = express.Router();
+router.use("/auth", authRoutes);
+router.use("/properties", propertyRoutes);
+router.use("/jobs", jobRoutes);
+router.use("/favorites", favoriteRoutes);
+router.use("/housing-requests", housingRequestRoutes);
+router.use("/reports", reportRoutes);
+router.use("/search", searchRoutes);
+router.use("/notifications", notificationRoutes);
+router.use("/chat", chatRoutes);
+router.use("/visits", visitRoutes);
+router.use("/workers", workerProfileRoutes);
+router.use("/uploads", uploadRoutes);
+router.use("/meta", metaRoutes);
+router.use("/admin", adminRoutes);
+router.use("/", userRoutes);
+
+module.exports = router;

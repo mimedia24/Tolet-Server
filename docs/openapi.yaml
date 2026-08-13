@@ -1,0 +1,709 @@
+openapi: 3.0.3
+info:
+  title: To-Let Platform API
+  version: 2.2.0
+  description: |
+    REST API for residential/commercial rentals and the fixed property/home-related jobs marketplace.
+    English is the default response language. Use `Accept-Language: bn` or `X-Language: bn` for Bangla messages.
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development
+tags:
+  - name: Auth
+  - name: Users
+  - name: Properties
+  - name: Jobs
+  - name: Housing Requests
+  - name: Workers
+  - name: Smart Search
+  - name: Engagement
+  - name: Chat
+  - name: Admin
+
+paths:
+  /auth/register/start:
+    post:
+      tags: [Auth]
+      summary: Start name/phone/password registration and send mandatory OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone, password]
+              properties:
+                name: { type: string }
+                phone: { type: string, example: "01712345678" }
+                password: { type: string, format: password, minLength: 8 }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /auth/register/verify:
+    post:
+      tags: [Auth]
+      summary: Verify registration OTP and activate account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone: { type: string }
+                otp: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login using phone and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password]
+              properties:
+                phone: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Error" }
+  /auth/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Send password-reset OTP
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /auth/password/reset:
+    post:
+      tags: [Auth]
+      summary: Verify OTP and replace password
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /auth/otp/request:
+    post:
+      tags: [Auth]
+      summary: Request a phone OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: "01712345678" }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "429": { $ref: "#/components/responses/Error" }
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verify OTP and register/login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone: { type: string }
+                otp: { type: string, pattern: "^[0-9]{6}$" }
+                name: { type: string }
+                preferredLanguage: { type: string, enum: [en, bn], default: en }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Error" }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate a refresh session and issue new tokens
+      requestBody: { $ref: "#/components/requestBodies/RefreshToken" }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke one refresh session
+      requestBody: { $ref: "#/components/requestBodies/RefreshToken" }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Revoke every session for the authenticated user
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+
+  /me:
+    get:
+      tags: [Users]
+      summary: Current profile and dashboard counts
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    patch:
+      tags: [Users]
+      summary: Update current profile
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                avatarUrl: { type: string, format: uri }
+                preferredLanguage: { type: string, enum: [en, bn] }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /me/capabilities:
+    patch:
+      tags: [Users]
+      summary: Set account capabilities
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capabilities]
+              properties:
+                capabilities:
+                  type: array
+                  items: { type: string, enum: [TENANT, PROPERTY_OWNER, EMPLOYER, JOB_SEEKER] }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /users/{id}/public:
+    get:
+      tags: [Users]
+      summary: Public user profile
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+
+  /meta:
+    get:
+      tags: [Users]
+      summary: Supported languages, categories, amenities, limits and feature flags
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+
+  /properties:
+    get:
+      tags: [Properties]
+      summary: Search active properties
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: kind, in: query, schema: { type: string, enum: [RESIDENTIAL, COMMERCIAL] } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: city, in: query, schema: { type: string } }
+        - { name: area, in: query, schema: { type: string } }
+        - { name: minRent, in: query, schema: { type: number } }
+        - { name: maxRent, in: query, schema: { type: number } }
+        - { name: lat, in: query, schema: { type: number } }
+        - { name: lng, in: query, schema: { type: number } }
+        - { name: radiusKm, in: query, schema: { type: number, maximum: 100 } }
+        - { name: verified, in: query, schema: { type: boolean } }
+        - { name: has360, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, low_price, high_price] } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    post:
+      tags: [Properties]
+      summary: Create a property draft
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PropertyInput" }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /properties/map:
+    get:
+      tags: [Properties]
+      summary: Get up to 500 map markers using the property filters
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /properties/me:
+    get:
+      tags: [Properties]
+      summary: Owner property dashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /properties/{id}:
+    get:
+      tags: [Properties]
+      summary: Property details
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    patch:
+      tags: [Properties]
+      summary: Update an owned property; active listings return to review
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PropertyInput" } } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Properties]
+      summary: Soft-delete an owned property
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /properties/{id}/submit:
+    post:
+      tags: [Properties]
+      summary: Submit a draft for Admin review
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /properties/{id}/status:
+    patch:
+      tags: [Properties]
+      summary: Owner availability transition
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties: { status: { type: string, enum: [ACTIVE, RESERVED, RENTED] } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /properties/{id}/contact:
+    post:
+      tags: [Properties]
+      summary: Get policy-controlled owner contact data
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+
+  /jobs:
+    get:
+      tags: [Jobs]
+      summary: Search active jobs
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: jobType, in: query, schema: { type: string } }
+        - { name: verifiedEmployer, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, salary_low, salary_high] } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    post:
+      tags: [Jobs]
+      summary: Create a job draft in one of the fixed 14 categories
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/JobInput" } } }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /jobs/me/posts:
+    get:
+      tags: [Jobs]
+      summary: Employer job dashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /jobs/me/applications:
+    get:
+      tags: [Jobs]
+      summary: Job seeker applications
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /jobs/{id}:
+    get:
+      tags: [Jobs]
+      summary: Job details
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    patch:
+      tags: [Jobs]
+      summary: Update an owned job
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/JobInput" } } } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Jobs]
+      summary: Soft-delete an owned job
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /jobs/{id}/submit:
+    post:
+      tags: [Jobs]
+      summary: Submit a job for Admin review
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /jobs/{id}/apply:
+    post:
+      tags: [Jobs]
+      summary: Apply to an active job
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [applicantName, phone, expectedAvailability]
+              properties:
+                applicantName: { type: string }
+                phone: { type: string }
+                experienceSummary: { type: string }
+                expectedAvailability: { type: string, format: date-time }
+                cvUrl: { type: string, format: uri }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /jobs/{id}/applicants:
+    get:
+      tags: [Jobs]
+      summary: Employer applicant list
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /jobs/applications/{applicationId}:
+    patch:
+      tags: [Jobs]
+      summary: Employer updates application status
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+
+  /favorites:
+    get:
+      tags: [Engagement]
+      summary: List favorites
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /favorites/{entityType}/{entityId}:
+    post:
+      tags: [Engagement]
+      summary: Save a PROPERTY or JOB
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: entityType, in: path, required: true, schema: { type: string, enum: [PROPERTY, JOB] } }, { name: entityId, in: path, required: true, schema: { type: string } }]
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+    delete:
+      tags: [Engagement]
+      summary: Remove a favorite
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: entityType, in: path, required: true, schema: { type: string, enum: [PROPERTY, JOB] } }, { name: entityId, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /reports:
+    post:
+      tags: [Engagement]
+      summary: Report property, job, user or message
+      security: [{ bearerAuth: [] }]
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+  /notifications:
+    get:
+      tags: [Engagement]
+      summary: Notification inbox
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /uploads/images:
+    post:
+      tags: [Engagement]
+      summary: Upload up to 10 JPG, PNG or WebP images
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images: { type: array, items: { type: string, format: binary } }
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+
+  /chat/conversations:
+    get:
+      tags: [Chat]
+      summary: List conversations
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+    post:
+      tags: [Chat]
+      summary: Open or reuse a conversation
+      security: [{ bearerAuth: [] }]
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+  /chat/conversations/{id}/messages:
+    get:
+      tags: [Chat]
+      summary: Conversation messages
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+    post:
+      tags: [Chat]
+      summary: Send a message
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Moderation dashboard counts
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/properties:
+    get:
+      tags: [Admin]
+      summary: List properties by moderation status
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/properties/{id}/moderate:
+    post:
+      tags: [Admin]
+      summary: Approve, require changes, reject, suspend, restore or mark duplicate
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/jobs:
+    get:
+      tags: [Admin]
+      summary: List jobs by moderation status
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/jobs/{id}/moderate:
+    post:
+      tags: [Admin]
+      summary: Moderate a job
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Search users
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/reports:
+    get:
+      tags: [Admin]
+      summary: Report review queue
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/settings:
+    get:
+      tags: [Admin]
+      summary: Platform settings
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+    patch:
+      tags: [Admin]
+      summary: Update limits, categories, amenities and feature flags
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: Immutable Admin action history
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+
+  /housing-requests:
+    get:
+      tags: [Housing Requests]
+      summary: Search active housing requests, optionally nearest first
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+    post:
+      tags: [Housing Requests]
+      summary: Create a “বাসা চাই” draft
+      security: [{ bearerAuth: [] }]
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+  /housing-requests/{id}/offers:
+    post:
+      tags: [Housing Requests]
+      summary: Offer an owned active property to a requester
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+  /workers:
+    get:
+      tags: [Workers]
+      summary: Search active worker profiles, optionally nearest first
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /workers/{id}/hire:
+    post:
+      tags: [Workers]
+      summary: Send a direct hire invitation
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+  /search/smart:
+    get:
+      tags: [Smart Search]
+      summary: Parse Bangla/English intent and return unified relevance/nearby-ranked results
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: lat, in: query, schema: { type: number } }
+        - { name: lng, in: query, schema: { type: number } }
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /uploads/spatial:
+    post:
+      tags: [Engagement]
+      summary: Upload one 360° panorama or GLB/GLTF/USDZ model
+      security: [{ bearerAuth: [] }]
+      responses: { "201": { $ref: "#/components/responses/Success" } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+  requestBodies:
+    RefreshToken:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [refreshToken]
+            properties: { refreshToken: { type: string } }
+  responses:
+    Success:
+      description: Successful response
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [success, code, message, data]
+      properties:
+        success: { type: boolean, example: true }
+        code: { type: string, example: OK }
+        message: { type: string }
+        data: {}
+        meta: { type: object }
+    ErrorEnvelope:
+      type: object
+      required: [success, code, message]
+      properties:
+        success: { type: boolean, example: false }
+        code: { type: string, example: VALIDATION_ERROR }
+        message: { type: string }
+        details: {}
+    LocalizedContent:
+      type: object
+      required: [en]
+      properties:
+        en:
+          type: object
+          required: [title, description]
+          properties: { title: { type: string }, description: { type: string } }
+        bn:
+          type: object
+          properties: { title: { type: string }, description: { type: string } }
+    LocationInput:
+      type: object
+      required: [city, area, address, latitude, longitude]
+      properties:
+        division: { type: string }
+        city: { type: string }
+        area: { type: string }
+        address: { type: string }
+        exactPublic: { type: boolean, default: false }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+    PropertyInput:
+      type: object
+      required: [kind, category, translations, rent, attributes, location, availableFrom]
+      properties:
+        kind: { type: string, enum: [RESIDENTIAL, COMMERCIAL] }
+        category: { type: string }
+        translations: { $ref: "#/components/schemas/LocalizedContent" }
+        rent: { type: number, minimum: 0 }
+        negotiable: { type: boolean }
+        attributes:
+          type: object
+          required: [sizeSqft]
+          properties:
+            sizeSqft: { type: number }
+            bedrooms: { type: integer }
+            bathrooms: { type: integer }
+            floor: { type: integer }
+        amenities: { type: array, items: { type: string } }
+        location: { $ref: "#/components/schemas/LocationInput" }
+        availableFrom: { type: string, format: date-time }
+        tour360Url: { type: string, format: uri }
+    JobInput:
+      type: object
+      required: [employerName, category, translations, salary, location, jobType, personsNeeded, workingHours, applicationDeadline]
+      properties:
+        employerName: { type: string }
+        category: { type: string, description: One of the fixed 14 property/home-related categories }
+        translations: { $ref: "#/components/schemas/LocalizedContent" }
+        salary:
+          type: object
+          required: [type]
+          properties:
+            type: { type: string, enum: [FIXED, RANGE] }
+            amount: { type: number }
+            min: { type: number }
+            max: { type: number }
+            period: { type: string, enum: [HOUR, DAY, MONTH, CONTRACT] }
+        location: { $ref: "#/components/schemas/LocationInput" }
+        jobType: { type: string, enum: [FULL_TIME, PART_TIME, CONTRACT, DAILY] }
+        personsNeeded: { type: integer, minimum: 1 }
+        workingHours: { type: string }
+        applicationDeadline: { type: string, format: date-time }

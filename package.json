@@ -1,0 +1,59 @@
+{
+  "name": "tolet-platform-server",
+  "version": "2.3.0",
+  "description": "Production-ready REST API for the ToLet rental and direct-hire work platform",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "cross-env NODE_ENV=test node --test --test-concurrency=1 tests/api.test.js tests/demoSeed.test.js tests/models.test.js tests/utils.test.js tests/validators.test.js",
+    "lint": "eslint .",
+    "check": "npm run lint && npm test",
+    "seed": "node scripts/seed.js",
+    "demo:preview": "node scripts/seed-demo.js --preview",
+    "demo:seed": "node scripts/seed-demo.js",
+    "demo:clear": "node scripts/seed-demo.js --clear",
+    "expire": "node scripts/expire-listings.js",
+    "migrate:v2": "node scripts/migrate-v2.js",
+    "migrate:v2.2": "node scripts/migrate-v2-2.js"
+  },
+  "keywords": [
+    "to-let",
+    "rental",
+    "property",
+    "jobs",
+    "bangladesh"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.0.1",
+    "helmet": "^8.1.0",
+    "hpp": "^0.2.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.17.1",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
+    "pino": "^9.7.0",
+    "pino-http": "^10.5.0",
+    "sanitize-html": "2.17.0",
+    "socket.io": "^4.8.1",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "cross-env": "^10.0.0",
+    "eslint": "^9.33.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
+  }
+}
