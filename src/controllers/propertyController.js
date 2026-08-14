@@ -1,4 +1,5 @@
 const Property = require("../models/Property");
+const Favorite = require("../models/Favorite");
 const { getSettings } = require("../services/settingsService");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
@@ -122,7 +123,21 @@ const listProperties = asyncHandler(async (req, res) => {
   const [items, total] = filter["location.point"]
     ? [await itemsPromise, null]
     : await Promise.all([itemsPromise, Property.countDocuments(filter)]);
-  return success(res, { data: items.map((item) => serialize(item, req)), meta: paginationMeta({ page, limit, total }) });
+  const favorites = req.user
+    ? await Favorite.find({
+        userId: req.user._id,
+        entityType: "PROPERTY",
+        entityId: {$in: items.map((item) => item._id)},
+      }).select("entityId")
+    : [];
+  const favoriteIds = new Set(favorites.map((item) => String(item.entityId)));
+  return success(res, {
+    data: items.map((item) => ({
+      ...serialize(item, req),
+      isFavorite: favoriteIds.has(String(item._id)),
+    })),
+    meta: paginationMeta({ page, limit, total }),
+  });
 });
 
 const listMapProperties = asyncHandler(async (req, res) => {

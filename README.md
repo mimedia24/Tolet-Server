@@ -1,5 +1,15 @@
 # To-Let Platform Server v2.3
 
+## V3 app integration update
+
+- Property list supports optional authentication and returns `isFavorite` for the signed-in user.
+- District filters power the shared All Bangladesh / selected-district Home and Work feeds.
+- Every chat message is stored first, then a durable notification record is created and Socket.IO emits `message:new` plus `notification:new`.
+- Opening a conversation marks its message notifications read and emits `message:read`; reconnecting clients rebuild unread totals from MongoDB, so a temporary socket disconnect does not lose the notification.
+- Property media still requires at least one image before submission. The V3 app sends optional automatic guided 3D scan output without video or external links.
+
+Background OS push while the app is completely closed additionally requires Firebase/APNs credentials and a mobile push SDK configuration. Those private credentials are intentionally not included in this source ZIP; database + realtime in-app delivery is fully wired.
+
 Production-oriented JavaScript/CommonJS server for the ToLet rental and direct-hire Work marketplace. It uses Node.js, Express.js, MongoDB/Mongoose, REST APIs, Socket.IO, phone OTP, JWT access tokens, rotating opaque refresh sessions, and bilingual API messages.
 
 English is the default language. Send `Accept-Language: bn` or `X-Language: bn` for Bangla system messages. Property and job content accepts both English and Bangla translations.

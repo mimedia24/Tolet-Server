@@ -18,7 +18,7 @@ const { propertySchemas } = require("../validators/schemas");
 
 const router = express.Router();
 
-router.get("/", listProperties);
+router.get("/", optionalAuthenticate, listProperties);
 router.get("/map", listMapProperties);
 router.get("/me", authenticate, requireCapability("PROPERTY_OWNER"), getMyProperties);
 router.post("/", authenticate, requireCapability("PROPERTY_OWNER"), validate(propertySchemas.create), createProperty);

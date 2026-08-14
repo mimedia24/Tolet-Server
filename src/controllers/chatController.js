@@ -2,6 +2,7 @@ const Conversation = require("../models/Conversation");
 const HousingRequest = require("../models/HousingRequest");
 const Job = require("../models/Job");
 const Message = require("../models/Message");
+const Notification = require("../models/Notification");
 const Property = require("../models/Property");
 const User = require("../models/User");
 const WorkerProfile = require("../models/WorkerProfile");
@@ -79,11 +80,25 @@ const ensureParticipant = async (conversationId, userId, requireUnblocked = fals
 };
 
 const listMessages = asyncHandler(async (req, res) => {
-  await ensureParticipant(req.params.id, req.user._id);
+  const conversation = await ensureParticipant(req.params.id, req.user._id);
   const { page, limit, skip } = getPagination(req.query);
   const filter = { conversationId: req.params.id, deletedAt: null };
   const [items, total] = await Promise.all([Message.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit), Message.countDocuments(filter)]);
   await Message.updateMany({ conversationId: req.params.id, senderId: { $ne: req.user._id }, readBy: { $ne: req.user._id } }, { $addToSet: { readBy: req.user._id } });
+  await Notification.updateMany(
+    {
+      userId: req.user._id,
+      type: "MESSAGE",
+      "data.conversationId": conversation._id,
+      readAt: null,
+    },
+    {$set: {readAt: new Date()}},
+  );
+  req.app.get("io")?.to(`conversation:${req.params.id}`).emit("message:read", {
+    conversationId: req.params.id,
+    userId: req.user._id,
+    readAt: new Date(),
+  });
   return success(res, { data: items.reverse(), meta: paginationMeta({ page, limit, total }) });
 });
 
@@ -101,7 +116,7 @@ const sendMessage = asyncHandler(async (req, res) => {
   await conversation.save();
 
   const recipientId = conversation.participants.find((id) => String(id) !== String(req.user._id));
-  await createNotification({
+  const notification = await createNotification({
     userId: recipientId,
     type: "MESSAGE",
     title: { en: "New message", bn: "নতুন মেসেজ" },
@@ -109,6 +124,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     data: { conversationId: conversation._id, messageId: message._id },
   });
   req.app.get("io")?.to(`user:${recipientId}`).emit("message:new", message);
+  req.app.get("io")?.to(`user:${recipientId}`).emit("notification:new", notification);
   req.app.get("io")?.to(`conversation:${conversation._id}`).emit("message:new", message);
   return success(res, { status: 201, code: "MESSAGE_SENT", data: message });
 });
