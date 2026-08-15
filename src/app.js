@@ -40,6 +40,18 @@ app.use(requestContext);
 app.use(language);
 app.use(pinoHttp({ logger, genReqId: (req) => req.id }));
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" }, contentSecurityPolicy: false }));
+// Public media uses content-addressed-style unique filenames. Serve it before
+// API CORS so WebView/model-viewer origins (including `null`) can reuse models.
+app.use(
+  "/uploads",
+  cors({origin: "*", methods: ["GET", "HEAD"], credentials: false}),
+  express.static(config.uploadDir, {
+    index: false,
+    etag: true,
+    immutable: config.isProduction,
+    maxAge: config.isProduction ? "365d" : 0,
+  })
+);
 app.use(
   cors({
     origin(origin, callback) {
@@ -56,8 +68,6 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(hpp());
 app.use(globalLimiter);
-app.use("/uploads", express.static(config.uploadDir, { index: false, maxAge: config.isProduction ? "7d" : 0 }));
-
 app.get("/health", (_req, res) =>
   res.json({
     success: true,

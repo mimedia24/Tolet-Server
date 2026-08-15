@@ -112,6 +112,8 @@ const propertyBase = {
       advance: z.number().min(0).optional(),
       serviceCharge: z.number().min(0).optional(),
       parkingCharge: z.number().min(0).optional(),
+      waterBill: z.number().min(0).optional(),
+      gasBill: z.number().min(0).optional(),
       otherCharge: z.number().min(0).optional(),
     })
     .optional(),

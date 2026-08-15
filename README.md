@@ -24,7 +24,7 @@ English is the default language. Send `Accept-Language: bn` or `X-Language: bn` 
 - Property-only bilingual smart search, nearest-first feeds when location is permitted, filters, GeoJSON support and Google Maps-ready latitude/longitude
 - Favorites, reports, notifications, media upload, audit logs, and configurable expiry/feature flags
 - Stable feed pagination and automatic rewriting of legacy private-LAN upload URLs to the current public server URL
-- Admin moderation for properties, housing requests, jobs and worker profiles; user suspension; report resolution; settings; immutable audit history
+- Admin moderation for properties, housing requests and worker profiles; regular job posts publish immediately; user suspension; report resolution; settings; immutable audit history
 - Realtime participant-authorized Socket.IO chat, blocking and property visit booking
 - 360° panorama and GLB/GLTF/USDZ spatial media upload support
 - English/Bangla content and system messages; English fallback
@@ -138,7 +138,7 @@ Admin may set `CHANGES_REQUIRED`, `REJECTED`, or `SUSPENDED`. Approved listings 
 
 Job:
 
-`DRAFT -> PENDING_REVIEW -> ACTIVE -> FILLED/CLOSED/EXPIRED`
+`CREATE -> ACTIVE -> FILLED/CLOSED/EXPIRED` (no Admin approval required)
 
 Application:
 

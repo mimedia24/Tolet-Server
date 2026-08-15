@@ -50,8 +50,15 @@ const findOwned = async (id, userId) => {
 };
 
 const createJob = asyncHandler(async (req, res) => {
-  const job = await Job.create({ ...preparePayload(req.validated.body), employerId: req.user._id, status: "DRAFT" });
-  return success(res, { status: 201, code: "JOB_CREATED", data: serialize(job, req, { ownerView: true }) });
+  const settings = await getSettings();
+  const job = await Job.create({
+    ...preparePayload(req.validated.body),
+    employerId: req.user._id,
+    status: "ACTIVE",
+    expiresAt: dateFromDays(settings.jobExpiryDays),
+    moderation: {reason: ""},
+  });
+  return success(res, { status: 201, code: "JOB_PUBLISHED", data: serialize(job, req, { ownerView: true }) });
 });
 
 const buildPublicFilter = (query) => {
@@ -119,10 +126,6 @@ const updateJob = asyncHandler(async (req, res) => {
   const job = await findOwned(req.validated.params.id, req.user._id);
   if (["FILLED", "CLOSED", "SUSPENDED"].includes(job.status)) throw new ApiError(409, "CONFLICT");
   Object.assign(job, preparePayload(req.validated.body));
-  if (job.status === "ACTIVE") {
-    job.status = "PENDING_REVIEW";
-    job.moderation.reason = "Updated by employer; re-review required";
-  }
   await job.save();
   return success(res, { code: "UPDATED", data: serialize(job, req, { ownerView: true }) });
 });
@@ -136,12 +139,16 @@ const deleteJob = asyncHandler(async (req, res) => {
 
 const submitJob = asyncHandler(async (req, res) => {
   const job = await findOwned(req.validated.params.id, req.user._id);
+  if (job.status === "ACTIVE")
+    return success(res, { code: "JOB_PUBLISHED", data: serialize(job, req, { ownerView: true }) });
   if (!["DRAFT", "CHANGES_REQUIRED", "REJECTED", "EXPIRED"].includes(job.status)) throw new ApiError(409, "CONFLICT");
   if (job.applicationDeadline <= new Date()) throw new ApiError(400, "VALIDATION_ERROR", "Application deadline must be in the future");
-  job.status = "PENDING_REVIEW";
+  const settings = await getSettings();
+  job.status = "ACTIVE";
+  job.expiresAt = dateFromDays(settings.jobExpiryDays);
   job.moderation.reason = "";
   await job.save();
-  return success(res, { code: "JOB_SUBMITTED", data: serialize(job, req, { ownerView: true }) });
+  return success(res, { code: "JOB_PUBLISHED", data: serialize(job, req, { ownerView: true }) });
 });
 
 const updateOwnerStatus = asyncHandler(async (req, res) => {

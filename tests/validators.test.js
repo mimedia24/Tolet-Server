@@ -10,11 +10,13 @@ const translations = { en: { title: "Modern apartment in Banani", description: "
 
 test("property request schema accepts bilingual residential input", () => {
   const result = propertySchemas.create.safeParse({
-    body: { kind: "RESIDENTIAL", category: "APARTMENT", translations, rent: 30000, attributes: { sizeSqft: 1400, bedrooms: 3, bathrooms: 2, kitchens: 1 }, location, availableFrom: new Date(Date.now() + 86400000).toISOString() },
+    body: { kind: "RESIDENTIAL", category: "APARTMENT", translations, rent: 30000, attributes: { sizeSqft: 1400, bedrooms: 3, bathrooms: 2, kitchens: 1 }, costs: {waterBill: 700, gasBill: 1080}, location, availableFrom: new Date(Date.now() + 86400000).toISOString() },
     query: {},
     params: {},
   });
   assert.equal(result.success, true);
+  assert.equal(result.data.body.costs.waterBill, 700);
+  assert.equal(result.data.body.costs.gasBill, 1080);
 });
 
 test("property request schema blocks commercial category on residential kind", () => {

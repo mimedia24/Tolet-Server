@@ -25,6 +25,8 @@ const propertySchema = new mongoose.Schema(
       advance: { type: Number, default: 0, min: 0 },
       serviceCharge: { type: Number, default: 0, min: 0 },
       parkingCharge: { type: Number, default: 0, min: 0 },
+      waterBill: { type: Number, default: 0, min: 0 },
+      gasBill: { type: Number, default: 0, min: 0 },
       otherCharge: { type: Number, default: 0, min: 0 },
     },
     attributes: {
