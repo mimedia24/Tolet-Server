@@ -7,6 +7,8 @@ const ApiError = require("../utils/ApiError");
 
 fs.mkdirSync(config.uploadDir, { recursive: true });
 fs.mkdirSync(config.kycUploadDir, { recursive: true });
+fs.mkdirSync(config.panorama.sessionDir, { recursive: true });
+fs.mkdirSync(config.panorama.panoramaDir, { recursive: true });
 
 const imageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const mediaTypes = new Set([...imageTypes, "model/gltf-binary", "model/gltf+json", "model/vnd.usdz+zip", "application/octet-stream"]);
@@ -49,4 +51,14 @@ const mediaUploader = createUploader(mediaTypes, 1, mediaExtensions);
 const nidUploader = multer({ storage: privateKycStorage, limits: { fileSize: config.maxFileSizeBytes, files: 2 }, fileFilter: (_req, file, callback) => imageTypes.has(file.mimetype) ? callback(null, true) : callback(new ApiError(400, "VALIDATION_ERROR", "NID must be a JPEG, PNG or WebP image")) });
 const cameraUploader = multer({ storage: cameraStorage, limits: { fileSize: config.maxFileSizeBytes, files: 1 }, fileFilter: (_req, file, callback) => imageTypes.has(file.mimetype) ? callback(null, true) : callback(new ApiError(400, "VALIDATION_ERROR", "Camera photo must be a JPEG, PNG or WebP image")) });
 
-module.exports = { cameraUploader, imageUploader, mediaUploader, nidUploader };
+// Panorama frames are validated by magic bytes in the controller (client-declared
+// mimetype/extension is not trustworthy), so they are buffered in memory briefly —
+// one frame per request, capped by panorama.frameMaxSizeBytes — then streamed to
+// the session's own directory on disk.
+const panoramaFrameUploader = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: config.panorama.frameMaxSizeBytes, files: 1 },
+  fileFilter: (_req, file, callback) => imageTypes.has(file.mimetype) ? callback(null, true) : callback(new ApiError(400, "VALIDATION_ERROR", "A frame must be a JPEG, PNG or WebP image")),
+});
+
+module.exports = { cameraUploader, imageUploader, mediaUploader, nidUploader, panoramaFrameUploader };

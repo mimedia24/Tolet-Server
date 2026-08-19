@@ -305,6 +305,37 @@ const workerProfileSchemas = {
   invitationStatus: request({ params: z.object({ invitationId: objectId }), body: z.object({ status: z.enum(["ACCEPTED", "DECLINED", "WITHDRAWN"]) }) }),
 };
 
+const panoramaSchemas = {
+  create: request({ body: z.object({ deviceMode: z.enum(["AR_DEPTH", "AR_TRACKING", "GYROSCOPE", "MANUAL"]).optional(), captureMode: z.enum(["AUTO", "MANUAL"]).optional() }) }),
+  byId: request({ params: z.object({ id: objectId }) }),
+  frame: request({
+    params: z.object({ id: objectId }),
+    body: z.object({
+      frameId: z.string().trim().min(1).max(80),
+      yaw: z.coerce.number().min(-360).max(360),
+      pitch: z.coerce.number().min(-90).max(90),
+      quality: z.coerce.number().min(0).max(1).optional(),
+    }),
+  }),
+  finalize: request({
+    params: z.object({ id: objectId }),
+    body: z.object({
+      coverage: z.object({
+        overall: z.number().min(0).max(100),
+        horizontal: z.number().min(0).max(100),
+        upper: z.number().min(0).max(100),
+        lower: z.number().min(0).max(100),
+      }),
+      quality: z.object({
+        sharpness: z.number().min(0).max(1).optional(),
+        lighting: z.number().min(0).max(1).optional(),
+        overallGrade: z.enum(["POOR", "FAIR", "GOOD", "EXCELLENT"]).optional(),
+      }).optional(),
+    }),
+  }),
+  attach: request({ params: z.object({ id: objectId }), body: z.object({ propertyId: objectId }) }),
+};
+
 const reportSchema = request({
   body: z.object({
     entityType: z.enum(["PROPERTY", "JOB", "USER", "MESSAGE"]),
@@ -321,6 +352,7 @@ module.exports = {
   jobSchemas,
   moderationSchemas,
   objectId,
+  panoramaSchemas,
   profileSchemas,
   propertySchemas,
   reportSchema,

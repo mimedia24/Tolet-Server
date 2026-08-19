@@ -13,6 +13,7 @@ const searchRoutes = require("./searchRoutes");
 const uploadRoutes = require("./uploadRoutes");
 const userRoutes = require("./userRoutes");
 const visitRoutes = require("./visitRoutes");
+const panoramaRoutes = require("./panoramaRoutes");
 const workerProfileRoutes = require("./workerProfileRoutes");
 
 const router = express.Router();
@@ -30,6 +31,7 @@ router.use("/workers", workerProfileRoutes);
 router.use("/uploads", uploadRoutes);
 router.use("/meta", metaRoutes);
 router.use("/admin", adminRoutes);
+router.use("/panorama", panoramaRoutes);
 router.use("/", userRoutes);
 
 module.exports = router;
