@@ -2,6 +2,7 @@ const Conversation = require("../models/Conversation");
 const HousingRequest = require("../models/HousingRequest");
 const Job = require("../models/Job");
 const Message = require("../models/Message");
+const MarketListing = require("../models/MarketListing");
 const Notification = require("../models/Notification");
 const Property = require("../models/Property");
 const User = require("../models/User");
@@ -23,6 +24,7 @@ const validateContextRecipient = async ({ contextType, contextId, recipientId })
     JOB: { Model: Job, ownerField: "employerId" },
     HOUSING_REQUEST: { Model: HousingRequest, ownerField: "requesterId" },
     WORKER_PROFILE: { Model: WorkerProfile, ownerField: "userId" },
+    MARKET_LISTING: { Model: MarketListing, ownerField: "sellerId" },
   };
   const target = models[contextType];
   if (!target) throw new ApiError(400, "VALIDATION_ERROR", "Unsupported conversation context");
@@ -123,9 +125,9 @@ const sendMessage = asyncHandler(async (req, res) => {
     body: { en: text.slice(0, 160), bn: text.slice(0, 160) },
     data: { conversationId: conversation._id, messageId: message._id },
   });
-  req.app.get("io")?.to(`user:${recipientId}`).emit("message:new", message);
-  req.app.get("io")?.to(`user:${recipientId}`).emit("notification:new", notification);
-  req.app.get("io")?.to(`conversation:${conversation._id}`).emit("message:new", message);
+  const io = req.app.get("io");
+  io?.to("user:" + recipientId).to("conversation:" + conversation._id).emit("message:new", message);
+  io?.to("user:" + recipientId).emit("notification:new", notification);
   return success(res, { status: 201, code: "MESSAGE_SENT", data: message });
 });
 

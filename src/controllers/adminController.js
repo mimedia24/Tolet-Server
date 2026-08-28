@@ -2,6 +2,7 @@ const path = require("path");
 const AdminLog = require("../models/AdminLog");
 const HousingRequest = require("../models/HousingRequest");
 const Job = require("../models/Job");
+const MarketListing = require("../models/MarketListing");
 const Property = require("../models/Property");
 const Report = require("../models/Report");
 const Setting = require("../models/Setting");
@@ -18,17 +19,18 @@ const { dateFromDays, getPagination, paginationMeta } = require("../utils/query"
 const { success } = require("../utils/response");
 
 const dashboard = asyncHandler(async (_req, res) => {
-  const [users, kyc, properties, jobs, housingRequests, workerProfiles, reports] = await Promise.all([
+  const [users, kyc, properties, jobs, housingRequests, workerProfiles, marketListings, reports] = await Promise.all([
     User.aggregate([{ $group: { _id: "$accountStatus", count: { $sum: 1 } } }]),
     User.aggregate([{ $group: { _id: "$verification.identityStatus", count: { $sum: 1 } } }]),
     Property.aggregate([{ $match: { deletedAt: null } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
     Job.aggregate([{ $match: { deletedAt: null } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
     HousingRequest.aggregate([{ $match: { deletedAt: null } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
     WorkerProfile.aggregate([{ $match: { deletedAt: null } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
+    MarketListing.aggregate([{ $match: { deletedAt: null } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
     Report.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
   ]);
   const toObject = (rows) => Object.fromEntries(rows.map((row) => [row._id, row.count]));
-  return success(res, { data: { users: toObject(users), kyc: toObject(kyc), properties: toObject(properties), jobs: toObject(jobs), housingRequests: toObject(housingRequests), workerProfiles: toObject(workerProfiles), reports: toObject(reports) } });
+  return success(res, { data: { users: toObject(users), kyc: toObject(kyc), properties: toObject(properties), jobs: toObject(jobs), housingRequests: toObject(housingRequests), workerProfiles: toObject(workerProfiles), marketListings: toObject(marketListings), reports: toObject(reports) } });
 });
 
 const listCollection = (Model, populate = "", ownerField = "") =>
@@ -50,6 +52,7 @@ const listProperties = listCollection(Property, "ownerId", "ownerId");
 const listJobs = listCollection(Job, "employerId", "employerId");
 const listHousingRequests = listCollection(HousingRequest, "requesterId", "requesterId");
 const listWorkerProfiles = listCollection(WorkerProfile, "userId", "userId");
+const listMarketListings = listCollection(MarketListing, "sellerId", "sellerId");
 
 const propertyActionMap = {
   APPROVE: "ACTIVE",
@@ -61,6 +64,7 @@ const propertyActionMap = {
 };
 const jobActionMap = { APPROVE: "ACTIVE", CHANGES_REQUIRED: "CHANGES_REQUIRED", REJECT: "REJECTED", SUSPEND: "SUSPENDED", RESTORE: "ACTIVE" };
 const requestActionMap = { APPROVE: "ACTIVE", CHANGES_REQUIRED: "CHANGES_REQUIRED", REJECT: "REJECTED", SUSPEND: "SUSPENDED", RESTORE: "ACTIVE" };
+const marketActionMap = { APPROVE: "ACTIVE", CHANGES_REQUIRED: "CHANGES_REQUIRED", REJECT: "REJECTED", SUSPEND: "SUSPENDED", RESTORE: "ACTIVE" };
 
 const requireReason = (action, reason) => {
   if (["CHANGES_REQUIRED", "REJECT", "SUSPEND", "MARK_DUPLICATE"].includes(action) && !reason) throw new ApiError(400, "VALIDATION_ERROR", "A reason is required for this moderation action");
@@ -151,6 +155,55 @@ const moderateWorkerProfile = asyncHandler(async (req, res) => {
   await Promise.all([
     audit({ req, action: `WORKER_PROFILE_${action}`, entityType: "WORKER_PROFILE", entityId: item._id, before, after: item.toObject() }),
     moderationNotification({ userId: item.userId, entityType: "WORKER_PROFILE", entityId: item._id, action: item.status, reason }),
+  ]);
+  return success(res, { code: "MODERATION_COMPLETED", data: item });
+});
+
+const moderateMarketListing = asyncHandler(async (req, res) => {
+  const item = await MarketListing.findOne({ _id: req.validated.params.id, deletedAt: null });
+  if (!item) throw new ApiError(404, "NOT_FOUND");
+  const { action, reason = "" } = req.validated.body;
+  requireReason(action, reason);
+  if (action === "APPROVE" && !["PENDING_REVIEW", "CHANGES_REQUIRED", "REJECTED", "SUSPENDED"].includes(item.status)) {
+    throw new ApiError(409, "CONFLICT");
+  }
+  const before = item.toObject();
+  const latestHistory = item.statusHistory.at(-1);
+  const submittedFromStatus =
+    latestHistory?.action === "SUBMITTED" ? item.statusHistory.at(-2)?.status : null;
+  item.status = marketActionMap[action];
+  item.moderation = { reason, reviewedBy: req.user._id, reviewedAt: new Date() };
+  if (["APPROVE", "RESTORE"].includes(action)) {
+    const settings = await getSettings();
+    item.expiresAt = dateFromDays(settings.marketListingExpiryDays);
+    item.publishedAt =
+      action === "APPROVE" && ["SOLD", "EXPIRED"].includes(submittedFromStatus)
+        ? new Date()
+        : item.publishedAt || new Date();
+    item.statusHistory.push({
+      status: "ACTIVE",
+      action: action === "RESTORE" ? "RESTORED" : "PUBLISHED",
+      changedBy: req.user._id,
+      changedAt: new Date(),
+    });
+  }
+  await item.save();
+  await Promise.all([
+    audit({
+      req,
+      action: "MARKET_LISTING_" + action,
+      entityType: "MARKET_LISTING",
+      entityId: item._id,
+      before,
+      after: item.toObject(),
+    }),
+    moderationNotification({
+      userId: item.sellerId,
+      entityType: "MARKET_LISTING",
+      entityId: item._id,
+      action: item.status,
+      reason,
+    }),
   ]);
   return success(res, { code: "MODERATION_COMPLETED", data: item });
 });
@@ -263,7 +316,7 @@ const resolveReport = asyncHandler(async (req, res) => {
 const getPlatformSettings = asyncHandler(async (_req, res) => success(res, { data: await getSettings() }));
 
 const updatePlatformSettings = asyncHandler(async (req, res) => {
-  const allowed = ["listingExpiryDays", "jobExpiryDays", "requestExpiryDays", "maxPropertyImages", "jobCategories", "amenities", "featureFlags"];
+  const allowed = ["listingExpiryDays", "jobExpiryDays", "requestExpiryDays", "marketListingExpiryDays", "maxPropertyImages", "maxMarketImages", "jobCategories", "marketCategories", "amenities", "featureFlags"];
   const patch = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
   if (!Object.keys(patch).length) throw new ApiError(400, "VALIDATION_ERROR");
   const before = await getSettings();
@@ -292,10 +345,12 @@ module.exports = {
   listReports,
   listUsers,
   listWorkerProfiles,
+  listMarketListings,
   moderateJob,
   moderateHousingRequest,
   moderateProperty,
   moderateWorkerProfile,
+  moderateMarketListing,
   resolveReport,
   updatePlatformSettings,
   updateUserRole,

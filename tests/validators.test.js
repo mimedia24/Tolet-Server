@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { authSchemas, housingRequestSchemas, jobSchemas, profileSchemas, propertySchemas, workerProfileSchemas } = require("../src/validators/schemas");
+const { authSchemas, housingRequestSchemas, jobSchemas, marketListingSchemas, profileSchemas, propertySchemas, workerProfileSchemas } = require("../src/validators/schemas");
 const { parseSmartQuery } = require("../src/services/smartSearchService");
 const { assertTransition, employerJobTransitions, ownerPropertyTransitions } = require("../src/utils/status");
 const { BANGLADESH_DISTRICTS } = require("../src/constants/districts");
@@ -83,10 +83,12 @@ test("owner and employer lifecycle transitions reject forbidden state changes", 
   assert.throws(() => assertTransition("DRAFT", "FILLED", employerJobTransitions));
 });
 
-test("password registration requires a strong-enough password and six digit OTP", () => {
-  const registration = authSchemas.registerStart.safeParse({ body: { name: "Rahim", phone: "01712345678", password: "strong-pass-123" }, query: {}, params: {} });
+test("password registration accepts four characters, rejects three and requires six digit OTP", () => {
+  const registration = authSchemas.registerStart.safeParse({ body: { name: "Rahim", phone: "01712345678", password: "1234" }, query: {}, params: {} });
+  const shortPassword = authSchemas.registerStart.safeParse({ body: { name: "Rahim", phone: "01712345678", password: "123" }, query: {}, params: {} });
   const badOtp = authSchemas.registerVerify.safeParse({ body: { phone: "01712345678", otp: "123" }, query: {}, params: {} });
   assert.equal(registration.success, true);
+  assert.equal(shortPassword.success, false);
   assert.equal(badOtp.success, false);
 });
 
@@ -99,6 +101,45 @@ test("work profile schema accepts required district data", () => {
   });
   assert.equal(requestResult.success, true);
   assert.equal(workerResult.success, true);
+});
+
+test("marketplace request uses the selected global district and requires an image", () => {
+  const valid = marketListingSchemas.create.safeParse({
+    body: {
+      translations: {
+        en: {
+          title: "Dining table with four chairs",
+          description: "Solid wooden dining table in good condition with four matching chairs.",
+        },
+      },
+      category: "HOME_FURNITURE",
+      condition: "USED",
+      price: 18000,
+      district: "Dhaka",
+      media: [{ type: "IMAGE", url: "https://example.com/table.jpg", order: 0 }],
+    },
+    query: {},
+    params: {},
+  });
+  const invalid = marketListingSchemas.create.safeParse({
+    body: {
+      translations: {
+        en: {
+          title: "Dining table with four chairs",
+          description: "Solid wooden dining table in good condition with four matching chairs.",
+        },
+      },
+      category: "HOME_FURNITURE",
+      condition: "USED",
+      price: 18000,
+      district: "ALL",
+      media: [],
+    },
+    query: {},
+    params: {},
+  });
+  assert.equal(valid.success, true);
+  assert.equal(invalid.success, false);
 });
 
 test("smart search understands Bangla tenant, bedrooms, area and budget", () => {

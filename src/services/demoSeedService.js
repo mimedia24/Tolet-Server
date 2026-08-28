@@ -4,6 +4,7 @@ const Favorite = require("../models/Favorite");
 const HireInvitation = require("../models/HireInvitation");
 const Message = require("../models/Message");
 const Notification = require("../models/Notification");
+const MarketListing = require("../models/MarketListing");
 const Property = require("../models/Property");
 const Session = require("../models/Session");
 const User = require("../models/User");
@@ -21,6 +22,24 @@ const firstNames = [
   "Nusrat", "Jannat", "Sumaiya", "Mim", "Sadia", "Tania", "Rima", "Farzana", "Sharmin", "Nadia",
 ];
 const lastNames = ["Ahmed", "Hossain", "Islam", "Rahman", "Khan", "Akter", "Sultana", "Chowdhury", "Mia", "Das"];
+const marketCatalog = [
+  {category: "MOBILE_TABLET", name: "Smartphone 128GB", bn: "স্মার্টফোন ১২৮ জিবি", brand: "Samsung", price: 28500},
+  {category: "MOBILE_TABLET", name: "Tablet with Keyboard", bn: "কিবোর্ডসহ ট্যাবলেট", brand: "Xiaomi", price: 22000},
+  {category: "ELECTRONICS_APPLIANCES", name: "Core i5 Laptop", bn: "কোর আই৫ ল্যাপটপ", brand: "Dell", price: 46500},
+  {category: "ELECTRONICS_APPLIANCES", name: "Smart LED Television", bn: "স্মার্ট এলইডি টেলিভিশন", brand: "Walton", price: 33500},
+  {category: "ELECTRONICS_APPLIANCES", name: "Energy Saving Refrigerator", bn: "এনার্জি সেভিং ফ্রিজ", brand: "Singer", price: 39500},
+  {category: "HOME_FURNITURE", name: "Modern Three Seat Sofa", bn: "আধুনিক তিন সিটের সোফা", brand: "Hatil", price: 32000},
+  {category: "HOME_FURNITURE", name: "Wooden Dining Table Set", bn: "কাঠের ডাইনিং টেবিল সেট", brand: "Otobi", price: 25500},
+  {category: "VEHICLES_PARTS", name: "Commuter Motorcycle", bn: "কমিউটার মোটরসাইকেল", brand: "Honda", price: 148000},
+  {category: "VEHICLES_PARTS", name: "Mountain Bicycle", bn: "মাউন্টেন বাইসাইকেল", brand: "Phoenix", price: 14500},
+  {category: "FASHION_PERSONAL", name: "Premium Cotton Saree", bn: "প্রিমিয়াম কটন শাড়ি", brand: "Aarong", price: 4200},
+  {category: "SPORTS_HOBBIES", name: "Professional Cricket Bat", bn: "প্রফেশনাল ক্রিকেট ব্যাট", brand: "SS", price: 7800},
+  {category: "SPORTS_HOBBIES", name: "Mirrorless Digital Camera", bn: "মিররলেস ডিজিটাল ক্যামেরা", brand: "Canon", price: 68500},
+  {category: "BUSINESS_EQUIPMENT", name: "Laser Office Printer", bn: "লেজার অফিস প্রিন্টার", brand: "HP", price: 24500},
+  {category: "BUSINESS_EQUIPMENT", name: "Ergonomic Office Chair", bn: "আরামদায়ক অফিস চেয়ার", brand: "Navana", price: 12500},
+  {category: "OTHER", name: "Cordless Power Drill", bn: "কর্ডলেস পাওয়ার ড্রিল", brand: "Bosch", price: 9800},
+  {category: "OTHER", name: "Wireless Headphones", bn: "ওয়্যারলেস হেডফোন", brand: "Sony", price: 6500},
+];
 const jobTitles = {
   CARETAKER: ["Experienced Building Caretaker", "অভিজ্ঞ বিল্ডিং কেয়ারটেকার"],
   SECURITY_GUARD: ["Trained Security Guard", "প্রশিক্ষিত নিরাপত্তাকর্মী"],
@@ -59,6 +78,7 @@ const buildDemoDataset = ({ count = DEMO_USER_COUNT, now = new Date() } = {}) =>
   const users = [];
   const properties = [];
   const workers = [];
+  const marketListings = [];
   for (let index = 0; index < count; index += 1) {
     const number = index + 1;
     const name = demoName(index);
@@ -81,7 +101,7 @@ const buildDemoDataset = ({ count = DEMO_USER_COUNT, now = new Date() } = {}) =>
       phoneVerified: true,
       preferredLanguage: index % 3 === 0 ? "bn" : "en",
       preferredLocation: { city: propertyDistrict.value, area: "Sadar" },
-      capabilities: ["TENANT", "PROPERTY_OWNER", "JOB_SEEKER"],
+      capabilities: ["TENANT", "PROPERTY_OWNER", "JOB_SEEKER", "MARKET_SELLER"],
       role: "USER",
       accountStatus: "ACTIVE",
       verification: { identityStatus: index % 3 === 0 ? "UNVERIFIED" : "VERIFIED", reviewedAt: index % 3 === 0 ? undefined : createdAt },
@@ -137,8 +157,52 @@ const buildDemoDataset = ({ count = DEMO_USER_COUNT, now = new Date() } = {}) =>
       stats: { views: 10 + index * 2, invitations: index % 8, hires: index % 4 },
       createdAt,
     });
+
+    const product = marketCatalog[index % marketCatalog.length];
+    const condition = ["NEW", "LIKE_NEW", "USED"][index % 3];
+    const conditionLabel = condition === "NEW" ? "brand new" : condition === "LIKE_NEW" ? "like new" : "carefully used";
+    marketListings.push({
+      demoIndex: number,
+      sellerPhone: demoPhone(index),
+      translations: {
+        en: {
+          title: `[DEMO] ${product.name} #${number}`,
+          description: `A clearly labeled demo marketplace product for testing ToLet. This ${product.brand} item is ${conditionLabel}, includes the shown accessories and can be discussed through in-app chat.`,
+        },
+        bn: {
+          title: `[ডেমো] ${product.bn} #${number}`,
+          description: `ToLet Marketplace পরীক্ষা করার জন্য স্পষ্টভাবে চিহ্নিত ডেমো পণ্য। পণ্যটি ${condition === "NEW" ? "নতুন" : condition === "LIKE_NEW" ? "প্রায় নতুন" : "ব্যবহৃত"} এবং ইন-অ্যাপ চ্যাটে দাম আলোচনা করা যাবে।`,
+        },
+      },
+      category: product.category,
+      condition,
+      price: product.price + Math.floor(index / marketCatalog.length) * 350,
+      negotiable: index % 3 !== 0,
+      district: propertyDistrict.value,
+      media: [{
+        type: "IMAGE",
+        url: `https://picsum.photos/seed/tolet-market-${String(number).padStart(3, "0")}/900/900`,
+        order: 0,
+        alt: {en: `Demo ${product.name}`, bn: `ডেমো ${product.bn}`},
+      }],
+      attributes: {
+        brand: product.brand,
+        model: `Demo Series ${(index % 12) + 1}`,
+        physicalCondition: conditionLabel,
+        warranty: condition === "NEW" ? "SHOP" : "NONE",
+        features: ["Demo listing", "In-app chat available", index % 2 === 0 ? "Price negotiable" : "Ready for pickup"],
+      },
+      contact: {phoneVisibility: "IN_APP_ONLY"},
+      status: "ACTIVE",
+      publishedAt: createdAt,
+      expiresAt: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
+      statusHistory: [{status: "ACTIVE", action: "DEMO_SEEDED", note: "Generated for marketplace UI testing", changedAt: createdAt}],
+      moderation: {reason: "Demo seed data", reviewedAt: createdAt},
+      stats: {views: 15 + index * 4, saves: index % 13, enquiries: index % 7},
+      createdAt,
+    });
   }
-  return { users, properties, workers };
+  return {users, properties, workers, marketListings};
 };
 
 const seedDemoData = async ({ password, count = DEMO_USER_COUNT } = {}) => {
@@ -171,13 +235,28 @@ const seedDemoData = async ({ password, count = DEMO_USER_COUNT } = {}) => {
       upsert: true,
     },
   }));
+  const marketOperations = dataset.marketListings.map(({demoIndex: _demoIndex, sellerPhone, createdAt, ...listing}) => ({
+    updateOne: {
+      filter: {
+        sellerId: usersByPhone.get(sellerPhone),
+        "translations.en.title": listing.translations.en.title,
+      },
+      update: {$set: listing, $setOnInsert: {createdAt}},
+      upsert: true,
+    },
+  }));
   await Property.bulkWrite(propertyOperations, { ordered: true });
   await WorkerProfile.bulkWrite(workerOperations, { ordered: true });
+  await MarketListing.bulkWrite(marketOperations, {ordered: true});
 
   return {
     users: await User.countDocuments({ phone: { $in: dataset.users.map((user) => user.phone) } }),
     properties: await Property.countDocuments({ ownerId: { $in: demoUsers.map((user) => user._id) }, "translations.en.title": /^\[DEMO\]/ }),
     workers: await WorkerProfile.countDocuments({ userId: { $in: demoUsers.map((user) => user._id) } }),
+    marketListings: await MarketListing.countDocuments({
+      sellerId: {$in: demoUsers.map((user) => user._id)},
+      "translations.en.title": /^\[DEMO\]/,
+    }),
     firstPhone: dataset.users[0]?.phone,
     lastPhone: dataset.users.at(-1)?.phone,
   };
@@ -188,21 +267,28 @@ const clearDemoData = async () => {
   const userIds = demoUsers.map((user) => user._id);
   const demoProperties = await Property.find({ ownerId: { $in: userIds } }).select("_id").lean();
   const propertyIds = demoProperties.map((property) => property._id);
+  const demoMarketListings = await MarketListing.find({sellerId: {$in: userIds}}).select("_id").lean();
+  const marketListingIds = demoMarketListings.map((listing) => listing._id);
   const conversations = await Conversation.find({ participants: { $in: userIds } }).select("_id").lean();
   const conversationIds = conversations.map((item) => item._id);
-  const [messages, conversationsResult, favorites, invitations, notifications, properties, sessions, visits, workers, users] = await Promise.all([
+  const [messages, conversationsResult, favorites, invitations, notifications, marketListings, properties, sessions, visits, workers, users] = await Promise.all([
     Message.deleteMany({ conversationId: { $in: conversationIds } }),
     Conversation.deleteMany({ _id: { $in: conversationIds } }),
-    Favorite.deleteMany({ $or: [{ userId: { $in: userIds } }, { entityType: "PROPERTY", entityId: { $in: propertyIds } }] }),
+    Favorite.deleteMany({$or: [
+      {userId: {$in: userIds}},
+      {entityType: "PROPERTY", entityId: {$in: propertyIds}},
+      {entityType: "MARKET_LISTING", entityId: {$in: marketListingIds}},
+    ]}),
     HireInvitation.deleteMany({ $or: [{ workerId: { $in: userIds } }, { employerId: { $in: userIds } }] }),
     Notification.deleteMany({ userId: { $in: userIds } }),
+    MarketListing.deleteMany({sellerId: {$in: userIds}}),
     Property.deleteMany({ ownerId: { $in: userIds } }),
     Session.deleteMany({ userId: { $in: userIds } }),
     VisitBooking.deleteMany({ $or: [{ visitorId: { $in: userIds } }, { ownerId: { $in: userIds } }, { propertyId: { $in: propertyIds } }] }),
     WorkerProfile.deleteMany({ userId: { $in: userIds } }),
     User.deleteMany({ _id: { $in: userIds }, phone: DEMO_PHONE_REGEX }),
   ]);
-  return { users: users.deletedCount, properties: properties.deletedCount, workers: workers.deletedCount, conversations: conversationsResult.deletedCount, messages: messages.deletedCount, favorites: favorites.deletedCount, invitations: invitations.deletedCount, notifications: notifications.deletedCount, sessions: sessions.deletedCount, visits: visits.deletedCount };
+  return {users: users.deletedCount, properties: properties.deletedCount, workers: workers.deletedCount, marketListings: marketListings.deletedCount, conversations: conversationsResult.deletedCount, messages: messages.deletedCount, favorites: favorites.deletedCount, invitations: invitations.deletedCount, notifications: notifications.deletedCount, sessions: sessions.deletedCount, visits: visits.deletedCount};
 };
 
 module.exports = { DEMO_PHONE_REGEX, DEMO_USER_COUNT, buildDemoDataset, clearDemoData, seedDemoData };

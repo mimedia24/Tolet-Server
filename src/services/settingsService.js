@@ -9,7 +9,8 @@ const getSettings = async () => {
       listingExpiryDays: config.defaultListingExpiryDays,
       jobExpiryDays: config.defaultJobExpiryDays,
       requestExpiryDays: config.defaultRequestExpiryDays,
-      featureFlags: { ...config.features, aiSearch: config.features.aiSearch, housingRequests: config.features.housingRequests, workerProfiles: config.features.workerProfiles },
+      marketListingExpiryDays: config.defaultListingExpiryDays,
+      featureFlags: { ...config.features, aiSearch: config.features.aiSearch, housingRequests: config.features.housingRequests, workerProfiles: config.features.workerProfiles, marketplace: true },
     });
   }
   return settings;

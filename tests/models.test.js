@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const Property = require("../src/models/Property");
 const Job = require("../src/models/Job");
+const MarketListing = require("../src/models/MarketListing");
 
 const location = { district: "Dhaka", city: "Dhaka", area: "Mohammadpur", address: "Road 3", exactPublic: false, point: { type: "Point", coordinates: [90.36, 23.76] } };
 const translations = { en: { title: "Three bedroom apartment", description: "A bright and comfortable apartment ready for a verified tenant." }, bn: { title: "তিন বেডরুমের ফ্ল্যাট", description: "ভেরিফাইড ভাড়াটিয়ার জন্য আরামদায়ক ফ্ল্যাট।" } };
@@ -21,4 +22,23 @@ test("job schema accepts only the fixed property-related categories", () => {
   assert.equal(job.validateSync(), undefined);
   job.category = "SOFTWARE_ENGINEER";
   assert.ok(job.validateSync().errors.category);
+});
+
+test("marketplace listing stores a global-header district and clean product facts", () => {
+  const listing = new MarketListing({
+    sellerId: "64b000000000000000000001",
+    translations: {
+      en: {
+        title: "Samsung Galaxy S23 Ultra",
+        description: "Used carefully and sold with the original box and charger.",
+      },
+    },
+    category: "MOBILE_TABLET",
+    condition: "USED",
+    price: 35555,
+    district: "Dhaka",
+    media: [{ type: "IMAGE", url: "https://example.com/phone.jpg", order: 0 }],
+    attributes: { brand: "Samsung", model: "S23 Ultra", warranty: "NONE" },
+  });
+  assert.equal(listing.validateSync(), undefined);
 });

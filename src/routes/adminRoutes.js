@@ -5,12 +5,14 @@ const {
   getUserKycDocument,
   listAuditLogs,
   listJobs,
+  listMarketListings,
   listHousingRequests,
   listProperties,
   listReports,
   listUsers,
   listWorkerProfiles,
   moderateJob,
+  moderateMarketListing,
   moderateHousingRequest,
   moderateProperty,
   moderateWorkerProfile,
@@ -32,6 +34,8 @@ router.get("/properties", listProperties);
 router.post("/properties/:id/moderate", validate(moderationSchemas.property), moderateProperty);
 router.get("/jobs", listJobs);
 router.post("/jobs/:id/moderate", validate(moderationSchemas.job), moderateJob);
+router.get("/market-listings", listMarketListings);
+router.post("/market-listings/:id/moderate", validate(moderationSchemas.job), moderateMarketListing);
 router.get("/housing-requests", listHousingRequests);
 router.post("/housing-requests/:id/moderate", validate(moderationSchemas.job), moderateHousingRequest);
 router.get("/worker-profiles", listWorkerProfiles);

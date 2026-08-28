@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const Job = require("../models/Job");
 const JobApplication = require("../models/JobApplication");
+const MarketListing = require("../models/MarketListing");
 const Property = require("../models/Property");
 const User = require("../models/User");
 const { publicUser } = require("../services/authService");
@@ -12,12 +13,13 @@ const asyncHandler = require("../utils/asyncHandler");
 const { success } = require("../utils/response");
 
 const getMe = asyncHandler(async (req, res) => {
-  const [properties, jobs, applications] = await Promise.all([
+  const [properties, jobs, applications, marketListings] = await Promise.all([
     Property.countDocuments({ ownerId: req.user._id, deletedAt: null }),
     Job.countDocuments({ employerId: req.user._id, deletedAt: null }),
     JobApplication.countDocuments({ applicantId: req.user._id }),
+    MarketListing.countDocuments({ sellerId: req.user._id, deletedAt: null }),
   ]);
-  return success(res, { data: { ...publicUser(req.user), counts: { properties, jobs, applications } } });
+  return success(res, { data: { ...publicUser(req.user), counts: { properties, jobs, applications, marketListings } } });
 });
 
 const updateMe = asyncHandler(async (req, res) => {

@@ -7,7 +7,7 @@ const startScheduler = () => {
   cron.schedule("*/15 * * * *", async () => {
     try {
       const result = await expireListings();
-      if (result.properties || result.jobs || result.housingRequests || result.notSureProperties) logger.info(result, "Listing lifecycle updated");
+      if (result.properties || result.jobs || result.housingRequests || result.marketListings || result.notSureProperties) logger.info(result, "Listing lifecycle updated");
     } catch (error) {
       logger.error({ err: error }, "Listing expiry job failed");
     }

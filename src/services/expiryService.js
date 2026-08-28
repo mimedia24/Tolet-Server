@@ -1,6 +1,7 @@
 const Job = require("../models/Job");
 const Property = require("../models/Property");
 const HousingRequest = require("../models/HousingRequest");
+const MarketListing = require("../models/MarketListing");
 const { createNotification } = require("./notificationService");
 
 const markUnconfirmedProperties = async (now) => {
@@ -24,12 +25,19 @@ const markUnconfirmedProperties = async (now) => {
 const expireListings = async () => {
   const now = new Date();
   const notSureProperties = await markUnconfirmedProperties(now);
-  const [properties, jobs, housingRequests] = await Promise.all([
+  const [properties, jobs, housingRequests, marketListings] = await Promise.all([
     Property.updateMany({ status: "ACTIVE", expiresAt: { $lte: now } }, { $set: { status: "EXPIRED" } }),
     Job.updateMany({ status: "ACTIVE", $or: [{ expiresAt: { $lte: now } }, { applicationDeadline: { $lt: now } }] }, { $set: { status: "EXPIRED" } }),
     HousingRequest.updateMany({ status: { $in: ["ACTIVE", "MATCHED"] }, expiresAt: { $lte: now } }, { $set: { status: "EXPIRED" } }),
+    MarketListing.updateMany({ status: "ACTIVE", expiresAt: { $lte: now } }, { $set: { status: "EXPIRED" } }),
   ]);
-  return { properties: properties.modifiedCount, jobs: jobs.modifiedCount, housingRequests: housingRequests.modifiedCount, notSureProperties };
+  return {
+    properties: properties.modifiedCount,
+    jobs: jobs.modifiedCount,
+    housingRequests: housingRequests.modifiedCount,
+    marketListings: marketListings.modifiedCount,
+    notSureProperties,
+  };
 };
 
 module.exports = { expireListings };

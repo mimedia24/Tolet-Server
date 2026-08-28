@@ -95,7 +95,8 @@ const invite = asyncHandler(async (req, res) => {
     throw error;
   });
   await WorkerProfile.updateOne({ _id: profile._id }, { $inc: { "stats.invitations": 1 } });
-  await createNotification({ userId: profile.userId, type: "HIRE_INVITATION", title: { en: "New hire invitation", bn: "নতুন নিয়োগ আমন্ত্রণ" }, body: { en: "An employer wants to hire you.", bn: "একজন নিয়োগকর্তা আপনাকে নিয়োগ দিতে চান।" }, data: { invitationId: item._id, workerProfileId: profile._id, jobId } });
+  const notification = await createNotification({ userId: profile.userId, type: "HIRE_INVITATION", title: { en: "New hire invitation", bn: "নতুন নিয়োগ আমন্ত্রণ" }, body: { en: "An employer wants to hire you.", bn: "একজন নিয়োগকর্তা আপনাকে নিয়োগ দিতে চান।" }, data: { invitationId: item._id, workerProfileId: profile._id, jobId } });
+  req.app.get("io")?.to(`user:${profile.userId}`).emit("notification:new", notification);
   return success(res, { status: 201, code: "HIRE_INVITATION_SENT", data: item });
 });
 
@@ -133,7 +134,8 @@ const updateInvitation = asyncHandler(async (req, res) => {
   await item.save();
   if (next === "ACCEPTED") await WorkerProfile.updateOne({ _id: item.workerProfileId }, { $inc: { "stats.hires": 1 } });
   const recipient = isWorkerAction ? item.employerId : item.workerId;
-  await createNotification({ userId: recipient, type: "HIRE_INVITATION", title: { en: "Hire invitation updated", bn: "নিয়োগ আমন্ত্রণ হালনাগাদ" }, body: { en: `Invitation is ${next.toLowerCase()}.`, bn: `আমন্ত্রণের অবস্থা: ${next}` }, data: { invitationId: item._id, status: next } });
+  const notification = await createNotification({ userId: recipient, type: "HIRE_INVITATION", title: { en: "Hire invitation updated", bn: "নিয়োগ আমন্ত্রণ হালনাগাদ" }, body: { en: `Invitation is ${next.toLowerCase()}.`, bn: `আমন্ত্রণের অবস্থা: ${next}` }, data: { invitationId: item._id, status: next } });
+  req.app.get("io")?.to(`user:${recipient}`).emit("notification:new", notification);
   return success(res, { code: "UPDATED", data: item });
 });
 

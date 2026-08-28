@@ -1,5 +1,6 @@
 const Job = require("../models/Job");
 const Message = require("../models/Message");
+const MarketListing = require("../models/MarketListing");
 const Property = require("../models/Property");
 const Report = require("../models/Report");
 const User = require("../models/User");
@@ -9,7 +10,13 @@ const { cleanText } = require("../utils/content");
 const { getPagination, paginationMeta } = require("../utils/query");
 const { success } = require("../utils/response");
 
-const models = { PROPERTY: Property, JOB: Job, USER: User, MESSAGE: Message };
+const models = {
+  PROPERTY: Property,
+  JOB: Job,
+  MARKET_LISTING: MarketListing,
+  USER: User,
+  MESSAGE: Message,
+};
 
 const createReport = asyncHandler(async (req, res) => {
   const body = req.validated.body;

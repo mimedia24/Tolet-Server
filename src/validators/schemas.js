@@ -6,6 +6,8 @@ const {
   COMMERCIAL_CATEGORIES,
   JOB_CATEGORIES,
   JOB_TYPES,
+  MARKET_CATEGORIES,
+  MARKET_CONDITIONS,
   PROPERTY_AMENITIES,
   PROPERTY_KINDS,
   REPORT_REASONS,
@@ -54,7 +56,7 @@ const authSchemas = {
     body: z.object({
       name: z.string().trim().min(2).max(100),
       phone: z.string().min(10).max(20),
-      password: z.string().min(8).max(128),
+      password: z.string().min(4).max(128),
       preferredLanguage: language.optional(),
     }),
   }),
@@ -62,7 +64,7 @@ const authSchemas = {
   phoneOnly: request({ body: z.object({ phone: z.string().min(10).max(20) }) }),
   login: request({ body: z.object({ phone: z.string().min(10).max(20), password: z.string().min(1).max(128) }) }),
   resetPassword: request({
-    body: z.object({ phone: z.string().min(10).max(20), otp: z.string().regex(/^\d{6}$/), newPassword: z.string().min(8).max(128) }),
+    body: z.object({ phone: z.string().min(10).max(20), otp: z.string().regex(/^\d{6}$/), newPassword: z.string().min(4).max(128) }),
   }),
   requestOtp: request({ body: z.object({ phone: z.string().min(10).max(20) }) }),
   verifyOtp: request({
@@ -154,6 +156,41 @@ const propertySchemas = {
   update: request({ body: z.object(Object.fromEntries(Object.entries(propertyBase).map(([key, value]) => [key, value.optional()]))) , params: z.object({ id: objectId }) }),
   byId: request({ params: z.object({ id: objectId }) }),
   ownerStatus: request({ body: z.object({ status: z.enum(["ACTIVE", "RESERVED", "RENTED"]), note: z.string().trim().max(500).optional() }), params: z.object({ id: objectId }) }),
+};
+
+const marketBase = {
+  translations: localizedContent,
+  category: z.enum(MARKET_CATEGORIES),
+  condition: z.enum(MARKET_CONDITIONS),
+  price: z.number().min(0).max(1000000000),
+  negotiable: z.boolean().optional(),
+  district: z.enum(DISTRICT_VALUES),
+  media: z.array(media).min(1).max(8),
+  attributes: z.object({
+    brand: z.string().trim().max(80).optional(),
+    model: z.string().trim().max(120).optional(),
+    physicalCondition: z.string().trim().max(300).optional(),
+    warranty: z.enum(["NONE", "SHOP", "MANUFACTURER"]).optional(),
+    features: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+  }).optional(),
+  contact: z.object({
+    phoneVisibility: z.enum(["AFTER_LOGIN", "IN_APP_ONLY"]).optional(),
+  }).optional(),
+};
+
+const marketListingSchemas = {
+  create: request({ body: z.object(marketBase) }),
+  update: request({
+    body: z
+      .object(Object.fromEntries(Object.entries(marketBase).map(([key, value]) => [key, value.optional()])))
+      .refine((value) => Object.keys(value).length > 0, "At least one field is required"),
+    params: z.object({ id: objectId }),
+  }),
+  byId: request({ params: z.object({ id: objectId }) }),
+  ownerStatus: request({
+    body: z.object({ status: z.literal("SOLD"), note: z.string().trim().max(500).optional() }),
+    params: z.object({ id: objectId }),
+  }),
 };
 
 const salary = z.object({
@@ -264,7 +301,7 @@ const chatSchemas = {
   create: request({
     body: z.object({
       recipientId: objectId,
-      contextType: z.enum(["PROPERTY", "JOB", "HOUSING_REQUEST", "WORKER_PROFILE", "GENERAL"]).default("GENERAL"),
+      contextType: z.enum(["PROPERTY", "JOB", "HOUSING_REQUEST", "WORKER_PROFILE", "MARKET_LISTING", "GENERAL"]).default("GENERAL"),
       contextId: objectId.optional(),
     }).superRefine((value, context) => {
       if (value.contextType !== "GENERAL" && !value.contextId) context.addIssue({ code: "custom", path: ["contextId"], message: "Context id is required" });
@@ -338,7 +375,7 @@ const panoramaSchemas = {
 
 const reportSchema = request({
   body: z.object({
-    entityType: z.enum(["PROPERTY", "JOB", "USER", "MESSAGE"]),
+    entityType: z.enum(["PROPERTY", "JOB", "MARKET_LISTING", "USER", "MESSAGE"]),
     entityId: objectId,
     reason: z.enum(REPORT_REASONS),
     details: z.string().trim().max(2000).optional(),
@@ -350,6 +387,7 @@ module.exports = {
   chatSchemas,
   housingRequestSchemas,
   jobSchemas,
+  marketListingSchemas,
   moderationSchemas,
   objectId,
   panoramaSchemas,

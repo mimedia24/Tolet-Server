@@ -36,7 +36,7 @@ const config = {
   otpExpiresMinutes: number(process.env.OTP_EXPIRES_MINUTES, 5),
   otpResendSeconds: number(process.env.OTP_RESEND_SECONDS, 45),
   otpMaxAttempts: number(process.env.OTP_MAX_ATTEMPTS, 5),
-  passwordMinLength: number(process.env.PASSWORD_MIN_LENGTH, 8),
+  passwordMinLength: number(process.env.PASSWORD_MIN_LENGTH, 4),
   loginMaxAttempts: number(process.env.LOGIN_MAX_ATTEMPTS, 5),
   loginLockMinutes: number(process.env.LOGIN_LOCK_MINUTES, 15),
   sms: {

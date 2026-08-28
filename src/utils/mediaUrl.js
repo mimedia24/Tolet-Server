@@ -20,6 +20,7 @@ const normalizeEntityMedia = (result) => {
   if (Array.isArray(result.media)) result.media = result.media.map((item) => ({ ...item, url: normalizeMediaUrl(item.url) }));
   for (const key of ["videoUrl", "tour360Url", "model3dUrl", "avatarUrl"]) if (result[key]) result[key] = normalizeMediaUrl(result[key]);
   if (result.ownerId?.avatarUrl) result.ownerId.avatarUrl = normalizeMediaUrl(result.ownerId.avatarUrl);
+  if (result.sellerId?.avatarUrl) result.sellerId.avatarUrl = normalizeMediaUrl(result.sellerId.avatarUrl);
   return result;
 };
 

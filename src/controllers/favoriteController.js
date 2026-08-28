@@ -1,5 +1,6 @@
 const Favorite = require("../models/Favorite");
 const Job = require("../models/Job");
+const MarketListing = require("../models/MarketListing");
 const Property = require("../models/Property");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
@@ -7,7 +8,14 @@ const { getPagination, paginationMeta } = require("../utils/query");
 const { success } = require("../utils/response");
 const { localize } = require("../utils/content");
 
-const getModel = (type) => (type === "PROPERTY" ? Property : type === "JOB" ? Job : null);
+const getModel = (type) =>
+  type === "PROPERTY"
+    ? Property
+    : type === "JOB"
+      ? Job
+      : type === "MARKET_LISTING"
+        ? MarketListing
+        : null;
 
 const addFavorite = asyncHandler(async (req, res) => {
   const type = String(req.params.entityType).toUpperCase();
@@ -40,8 +48,13 @@ const listFavorites = asyncHandler(async (req, res) => {
 
   const propertyIds = favorites.filter((item) => item.entityType === "PROPERTY").map((item) => item.entityId);
   const jobIds = favorites.filter((item) => item.entityType === "JOB").map((item) => item.entityId);
-  const [properties, jobs] = await Promise.all([Property.find({ _id: { $in: propertyIds }, status: "ACTIVE" }), Job.find({ _id: { $in: jobIds }, status: "ACTIVE" })]);
-  const entities = new Map([...properties, ...jobs].map((item) => [String(item._id), item]));
+  const marketIds = favorites.filter((item) => item.entityType === "MARKET_LISTING").map((item) => item.entityId);
+  const [properties, jobs, marketListings] = await Promise.all([
+    Property.find({ _id: { $in: propertyIds }, status: "ACTIVE" }),
+    Job.find({ _id: { $in: jobIds }, status: "ACTIVE" }),
+    MarketListing.find({ _id: { $in: marketIds }, status: "ACTIVE" }),
+  ]);
+  const entities = new Map([...properties, ...jobs, ...marketListings].map((item) => [String(item._id), item]));
   const data = favorites.map((favorite) => {
     const entity = entities.get(String(favorite.entityId));
     return { ...favorite.toObject(), entity: entity ? localize(entity, res.locals.language) : null };

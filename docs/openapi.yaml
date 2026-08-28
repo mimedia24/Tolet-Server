@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: To-Let Platform API
-  version: 2.2.0
+  version: 2.3.0
   description: |
     REST API for residential/commercial rentals and the fixed property/home-related jobs marketplace.
     English is the default response language. Use `Accept-Language: bn` or `X-Language: bn` for Bangla messages.
@@ -13,6 +13,7 @@ tags:
   - name: Users
   - name: Properties
   - name: Jobs
+  - name: Marketplace
   - name: Housing Requests
   - name: Workers
   - name: Smart Search
@@ -407,6 +408,106 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Success" }
 
+  /market-listings:
+    get:
+      tags: [Marketplace]
+      summary: Browse active, unexpired Marketplace listings
+      description: Pass the app header's selected district. Omit district, or pass ALL, for the nationwide feed.
+      security: [{ bearerAuth: [] }, {}]
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: district, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: condition, in: query, schema: { type: string, enum: [NEW, LIKE_NEW, USED] } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: minPrice, in: query, schema: { type: number, minimum: 0 } }
+        - { name: maxPrice, in: query, schema: { type: number, minimum: 0 } }
+        - { name: sellerId, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, low_price, high_price, popular] } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    post:
+      tags: [Marketplace]
+      summary: Create a Marketplace draft for a specific district
+      description: Requires the MARKET_SELLER capability. ALL is not a valid listing district.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/MarketListingInput" } } }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /market-listings/me:
+    get:
+      tags: [Marketplace]
+      summary: Paginated owner listing management feed
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/Limit" }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /market-listings/{id}:
+    get:
+      tags: [Marketplace]
+      summary: Get a public listing or an owner's non-public listing
+      security: [{ bearerAuth: [] }, {}]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    patch:
+      tags: [Marketplace]
+      summary: Update an owned listing; active listings return to review
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/MarketListingInput" } } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Marketplace]
+      summary: Soft-delete an owned listing
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /market-listings/{id}/submit:
+    post:
+      tags: [Marketplace]
+      summary: Submit or relist a draft, rejected, sold, or expired listing for review
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /market-listings/{id}/status:
+    patch:
+      tags: [Marketplace]
+      summary: Mark an active owned listing as sold
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [SOLD] }
+                note: { type: string, maxLength: 500 }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /market-listings/{id}/contact:
+    post:
+      tags: [Marketplace]
+      summary: Get policy-controlled seller contact data and record an enquiry
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+
   /favorites:
     get:
       tags: [Engagement]
@@ -416,9 +517,9 @@ paths:
   /favorites/{entityType}/{entityId}:
     post:
       tags: [Engagement]
-      summary: Save a PROPERTY or JOB
+      summary: Save a PROPERTY, JOB, or MARKET_LISTING
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: entityType, in: path, required: true, schema: { type: string, enum: [PROPERTY, JOB] } }, { name: entityId, in: path, required: true, schema: { type: string } }]
+      parameters: [{ name: entityType, in: path, required: true, schema: { type: string, enum: [PROPERTY, JOB, MARKET_LISTING] } }, { name: entityId, in: path, required: true, schema: { type: string } }]
       responses: { "201": { $ref: "#/components/responses/Success" } }
     delete:
       tags: [Engagement]
@@ -507,6 +608,19 @@ paths:
     post:
       tags: [Admin]
       summary: Moderate a job
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Id" }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/market-listings:
+    get:
+      tags: [Admin]
+      summary: List Marketplace listings by moderation status
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { $ref: "#/components/responses/Success" } }
+  /admin/market-listings/{id}/moderate:
+    post:
+      tags: [Admin]
+      summary: Approve, require changes, reject, suspend, or restore a Marketplace listing
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/Id" }]
       responses: { "200": { $ref: "#/components/responses/Success" } }
@@ -707,3 +821,38 @@ components:
         personsNeeded: { type: integer, minimum: 1 }
         workingHours: { type: string }
         applicationDeadline: { type: string, format: date-time }
+    MarketListingInput:
+      type: object
+      required: [translations, category, condition, price, district, media]
+      properties:
+        translations: { $ref: "#/components/schemas/LocalizedContent" }
+        category:
+          type: string
+          enum: [MOBILE_TABLET, ELECTRONICS_APPLIANCES, HOME_FURNITURE, VEHICLES_PARTS, FASHION_PERSONAL, SPORTS_HOBBIES, BUSINESS_EQUIPMENT, OTHER]
+        condition: { type: string, enum: [NEW, LIKE_NEW, USED] }
+        price: { type: number, minimum: 0, maximum: 1000000000 }
+        negotiable: { type: boolean }
+        district: { type: string, description: One of the 64 configured districts; ALL is invalid }
+        media:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            type: object
+            required: [type, url]
+            properties:
+              type: { type: string, enum: [IMAGE] }
+              url: { type: string }
+              order: { type: integer, minimum: 0 }
+        attributes:
+          type: object
+          properties:
+            brand: { type: string, maxLength: 80 }
+            model: { type: string, maxLength: 120 }
+            physicalCondition: { type: string, maxLength: 300 }
+            warranty: { type: string, enum: [NONE, SHOP, MANUFACTURER] }
+            features: { type: array, maxItems: 20, items: { type: string, maxLength: 100 } }
+        contact:
+          type: object
+          properties:
+            phoneVisibility: { type: string, enum: [AFTER_LOGIN, IN_APP_ONLY] }

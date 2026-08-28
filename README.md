@@ -2,6 +2,9 @@
 
 ## V3 app integration update
 
+- The mobile bottom navigation now exposes Marketplace; Profile is opened from the global header avatar.
+- Marketplace browsing follows the global header district. Creating a listing is blocked while `All Bangladesh` is selected, because each post must belong to one specific district.
+- Marketplace supports drafts, Admin review, district/category/condition/search/sort filters, favorites, reports, seller chat/contact, notifications, sold state, expiry, and relisting.
 - Property list supports optional authentication and returns `isFavorite` for the signed-in user.
 - District filters power the shared All Bangladesh / selected-district Home and Work feeds.
 - Every chat message is stored first, then a durable notification record is created and Socket.IO emits `message:new` plus `notification:new`.
@@ -19,6 +22,7 @@ English is the default language. Send `Accept-Language: bn` or `X-Language: bn` 
 - Name, phone and password registration with mandatory SMS OTP verification; phone/password login, password reset and legacy OTP migration path
 - Phone OTP activates the account; the verified badge separately requires NID front/back, a live camera photo and Admin KYC approval
 - Residential and shop/commercial property drafts, moderation, seven-day availability confirmation, Not Sure/Reserved/Rented states, re-listing and lifecycle history
+- District-scoped Marketplace listings with clean public feed, seller management, Admin review, favorites, chat/contact, sold/expired states and relisting
 - Bangladesh-focused Work profiles, two-sided Hire Center, hire invitations and direct messaging
 - All 64 Bangladesh districts, required district data on new rental/Work posts, and district filtering
 - Property-only bilingual smart search, nearest-first feeds when location is permitted, filters, GeoJSON support and Google Maps-ready latitude/longitude
@@ -117,7 +121,8 @@ Public responses return localized `title` and `description`. Owners/Admins can r
 | `/api/v1/housing-requests` | User-posted housing needs and matching owner offers |
 | `/api/v1/workers` | Work profiles and direct hire invitations |
 | `/api/v1/search/smart?scope=PROPERTY` | Property-only bilingual smart search |
-| `/api/v1/favorites` | Saved properties/jobs |
+| `/api/v1/market-listings` | Public district feed and seller listing lifecycle |
+| `/api/v1/favorites` | Saved properties/jobs/Marketplace listings |
 | `/api/v1/reports` | User reports |
 | `/api/v1/notifications` | Notification inbox/read state |
 | `/api/v1/chat` | Conversations/messages (feature flag) |
@@ -147,6 +152,12 @@ Application:
 Worker profile:
 
 `DRAFT -> PENDING_REVIEW -> ACTIVE/PAUSED`; an employer can send a direct hire invitation which the worker accepts or declines.
+
+Marketplace listing:
+
+`DRAFT -> PENDING_REVIEW -> ACTIVE -> SOLD/EXPIRED`
+
+Admin may set `CHANGES_REQUIRED`, `REJECTED`, or `SUSPENDED`. Editing an active listing returns it to review. A sold or expired listing can be submitted again; approval renews its expiry and publish date.
 
 ## Existing database upgrade
 

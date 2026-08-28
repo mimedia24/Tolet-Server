@@ -7,7 +7,7 @@ const conversationSchema = new mongoose.Schema(
       validate: [(value) => value.length === 2, "A conversation must have exactly two participants"],
     },
     participantKey: { type: String, required: true, unique: true, index: true },
-    contextType: { type: String, enum: ["PROPERTY", "JOB", "HOUSING_REQUEST", "WORKER_PROFILE", "GENERAL"], default: "GENERAL" },
+    contextType: { type: String, enum: ["PROPERTY", "JOB", "HOUSING_REQUEST", "WORKER_PROFILE", "MARKET_LISTING", "GENERAL"], default: "GENERAL" },
     contextId: mongoose.Schema.Types.ObjectId,
     lastMessageAt: { type: Date, default: Date.now, index: true },
     lastMessagePreview: { type: String, maxlength: 200, default: "" },
