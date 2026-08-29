@@ -1,9 +1,10 @@
 const Favorite = require("../models/Favorite");
 const MarketListing = require("../models/MarketListing");
+const { getSettings } = require("../services/settingsService");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { cleanLocalized, cleanText, localize } = require("../utils/content");
-const { getPagination, paginationMeta } = require("../utils/query");
+const { dateFromDays, getPagination, paginationMeta } = require("../utils/query");
 const { normalizeEntityMedia } = require("../utils/mediaUrl");
 const { success } = require("../utils/response");
 
@@ -48,13 +49,20 @@ const findOwned = async (id, sellerId) => {
 };
 
 const createMarketListing = asyncHandler(async (req, res) => {
+  if (!req.validated.body.media?.length) {
+    throw new ApiError(400, "VALIDATION_ERROR", "At least one marketplace image is required");
+  }
+  const settings = await getSettings();
+  const now = new Date();
   const listing = await MarketListing.create({
     ...preparePayload(req.validated.body),
     sellerId: req.user._id,
-    status: "DRAFT",
+    status: "ACTIVE",
+    publishedAt: now,
+    expiresAt: dateFromDays(settings.marketListingExpiryDays),
     statusHistory: [{
-      status: "DRAFT",
-      action: "CREATED",
+      status: "ACTIVE",
+      action: "PUBLISHED",
       changedBy: req.user._id,
       changedAt: new Date(),
     }],
@@ -179,10 +187,7 @@ const updateMarketListing = asyncHandler(async (req, res) => {
   const listing = await findOwned(req.validated.params.id, req.user._id);
   if (listing.status === "SUSPENDED") throw new ApiError(409, "CONFLICT");
   Object.assign(listing, preparePayload(req.validated.body));
-  if (listing.status === "ACTIVE") {
-    listing.status = "PENDING_REVIEW";
-    listing.moderation.reason = "Updated by seller; re-review required";
-  }
+  listing.moderation.reason = "";
   listing.statusHistory.push({
     status: listing.status,
     action: "DETAILS_UPDATED",
@@ -211,23 +216,29 @@ const deleteMarketListing = asyncHandler(async (req, res) => {
 
 const submitMarketListing = asyncHandler(async (req, res) => {
   const listing = await findOwned(req.validated.params.id, req.user._id);
+  if (listing.status === "ACTIVE") {
+    return success(res, { code: "MARKET_LISTING_PUBLISHED", data: serialize(listing, req, { ownerView: true }) });
+  }
   if (!["DRAFT", "CHANGES_REQUIRED", "REJECTED", "EXPIRED", "SOLD"].includes(listing.status)) {
     throw new ApiError(409, "CONFLICT");
   }
   if (!listing.media.length) {
     throw new ApiError(400, "VALIDATION_ERROR", "At least one marketplace image is required");
   }
-  listing.status = "PENDING_REVIEW";
+  const settings = await getSettings();
+  listing.status = "ACTIVE";
+  listing.publishedAt = new Date();
+  listing.expiresAt = dateFromDays(settings.marketListingExpiryDays);
   listing.moderation.reason = "";
   listing.statusHistory.push({
-    status: "PENDING_REVIEW",
-    action: "SUBMITTED",
+    status: "ACTIVE",
+    action: "PUBLISHED",
     changedBy: req.user._id,
     changedAt: new Date(),
   });
   await listing.save();
   return success(res, {
-    code: "MARKET_LISTING_SUBMITTED",
+    code: "MARKET_LISTING_PUBLISHED",
     data: serialize(listing, req, { ownerView: true }),
   });
 });

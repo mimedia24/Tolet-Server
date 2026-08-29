@@ -24,13 +24,11 @@ const prepare = (body) => ({
 const saveMine = asyncHandler(async (req, res) => {
   const payload = prepare(req.validated.body);
   const existing = await WorkerProfile.findOne({ userId: req.user._id, deletedAt: null });
-  if (existing && ["ACTIVE", "PENDING_REVIEW"].includes(existing.status)) {
-    payload.status = "PENDING_REVIEW";
-    payload.moderation = {reason: ""};
-  }
+  payload.status = "ACTIVE";
+  payload.moderation = {reason: ""};
   const item = await WorkerProfile.findOneAndUpdate(
     { userId: req.user._id, deletedAt: null },
-    { $set: payload, $setOnInsert: { userId: req.user._id, status: "DRAFT" } },
+    { $set: payload, $setOnInsert: { userId: req.user._id } },
     { new: true, upsert: true, runValidators: true }
   );
   return success(res, { status: existing ? 200 : 201, code: existing ? "UPDATED" : "CREATED", data: item });
@@ -44,13 +42,13 @@ const getMine = asyncHandler(async (req, res) => {
 const submitMine = asyncHandler(async (req, res) => {
   const item = await WorkerProfile.findOne({ userId: req.user._id, deletedAt: null });
   if (!item) throw new ApiError(404, "NOT_FOUND");
-  if (item.status === "PENDING_REVIEW")
-    return success(res, { code: "SUBMITTED", data: item });
-  if (!["DRAFT", "CHANGES_REQUIRED", "REJECTED", "PAUSED"].includes(item.status)) throw new ApiError(409, "CONFLICT");
-  item.status = "PENDING_REVIEW";
+  if (item.status === "ACTIVE")
+    return success(res, { code: "PUBLISHED", data: item });
+  if (!["DRAFT", "PENDING_REVIEW", "CHANGES_REQUIRED", "REJECTED", "PAUSED"].includes(item.status)) throw new ApiError(409, "CONFLICT");
+  item.status = "ACTIVE";
   item.moderation.reason = "";
   await item.save();
-  return success(res, { code: "SUBMITTED", data: item });
+  return success(res, { code: "PUBLISHED", data: item });
 });
 
 const list = asyncHandler(async (req, res) => {

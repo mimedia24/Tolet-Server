@@ -164,10 +164,7 @@ const updateProperty = asyncHandler(async (req, res) => {
   if (property.status === "SUSPENDED") throw new ApiError(409, "CONFLICT");
   const payload = preparePayload(req.validated.body);
   Object.assign(property, payload);
-  if (["ACTIVE", "RESERVED"].includes(property.status)) {
-    property.status = "PENDING_REVIEW";
-    property.moderation.reason = "Updated by owner; re-review required";
-  }
+  property.moderation.reason = "";
   pushHistory(property, { action: "DETAILS_UPDATED", changedBy: req.user._id });
   await property.save();
   return success(res, { code: "UPDATED", data: serialize(property, req, { ownerView: true }) });
@@ -183,12 +180,15 @@ const deleteProperty = asyncHandler(async (req, res) => {
 
 const submitProperty = asyncHandler(async (req, res) => {
   const property = await findOwned(req.validated.params.id, req.user._id);
+  if (property.status === "ACTIVE") {
+    return success(res, { code: "PROPERTY_PUBLISHED", data: serialize(property, req, { ownerView: true }) });
+  }
   if (!["DRAFT", "CHANGES_REQUIRED", "REJECTED", "EXPIRED"].includes(property.status)) throw new ApiError(409, "CONFLICT");
   if (!property.media.length) throw new ApiError(400, "VALIDATION_ERROR", "At least one property image is required before submission");
-  property.status = "PENDING_REVIEW";
+  await approveExpiry(property);
   property.moderation.reason = "";
   await property.save();
-  return success(res, { code: "PROPERTY_SUBMITTED", data: serialize(property, req, { ownerView: true }) });
+  return success(res, { code: "PROPERTY_PUBLISHED", data: serialize(property, req, { ownerView: true }) });
 });
 
 const updateOwnerStatus = asyncHandler(async (req, res) => {
