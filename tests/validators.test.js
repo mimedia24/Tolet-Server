@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { authSchemas, housingRequestSchemas, jobSchemas, marketListingSchemas, profileSchemas, propertySchemas, workerProfileSchemas } = require("../src/validators/schemas");
+const { authSchemas, chatSchemas, deviceSchemas, housingRequestSchemas, jobSchemas, marketListingSchemas, profileSchemas, propertySchemas, propertySocialSchemas, workerProfileSchemas } = require("../src/validators/schemas");
 const { parseSmartQuery } = require("../src/services/smartSearchService");
 const { assertTransition, employerJobTransitions, ownerPropertyTransitions } = require("../src/utils/status");
 const { BANGLADESH_DISTRICTS } = require("../src/constants/districts");
@@ -155,4 +155,28 @@ test("smart search understands Banglish occupant count", () => {
   assert.equal(result.intent, "PROPERTY");
   assert.equal(result.kind, "RESIDENTIAL");
   assert.equal(result.occupants, 3);
+});
+
+test("chat idempotency and push device payloads are validated", () => {
+  const message = chatSchemas.message.safeParse({
+    body: {text: "Hello", clientMessageId: "msg-client-123456"},
+    query: {},
+    params: {id: "64b000000000000000000001"},
+  });
+  const device = deviceSchemas.registerPush.safeParse({
+    body: {installationId: "android-installation-123", token: "fcm-token-value-long-enough", platform: "ANDROID"},
+    query: {},
+    params: {},
+  });
+  assert.equal(message.success, true);
+  assert.equal(device.success, true);
+  assert.equal(deviceSchemas.registerPush.safeParse({body: {...device.data.body, platform: "WEB"}, query: {}, params: {}}).success, false);
+});
+
+test("property comments allow one valid parent and reject empty or oversized text", () => {
+  const params = {id: "64b000000000000000000001"};
+  const parentId = "64b000000000000000000002";
+  assert.equal(propertySocialSchemas.create.safeParse({body: {body: "Interested", parentId}, query: {}, params}).success, true);
+  assert.equal(propertySocialSchemas.create.safeParse({body: {body: ""}, query: {}, params}).success, false);
+  assert.equal(propertySocialSchemas.create.safeParse({body: {body: "x".repeat(1001)}, query: {}, params}).success, false);
 });

@@ -4,6 +4,7 @@ const { normalizeLanguage, t } = require("../src/utils/i18n");
 const { normalizeBangladeshPhone } = require("../src/utils/phone");
 const { generateOpaqueToken, hashOtp, signAccessToken, verifyAccessToken } = require("../src/utils/security");
 const { normalizeMediaUrl } = require("../src/utils/mediaUrl");
+const {decryptPushToken, encryptPushToken} = require("../src/utils/pushTokenCrypto");
 
 test("Bangladesh phone numbers are normalized to E.164", () => {
   assert.equal(normalizeBangladeshPhone("01712-345678"), "+8801712345678");
@@ -32,4 +33,12 @@ test("stale private-LAN upload URLs are rewritten to the configured public serve
   const normalized = normalizeMediaUrl("http://192.168.1.107:5000/uploads/property.jpg");
   assert.match(normalized, /\/uploads\/property\.jpg$/);
   assert.doesNotMatch(normalized, /192\.168\.1\.107/);
+});
+
+test("push registration tokens are encrypted and recoverable", () => {
+  const token = "firebase-registration-token-secret-value";
+  const encrypted = encryptPushToken(token);
+  assert.notEqual(encrypted.tokenCiphertext, token);
+  assert.equal(encrypted.tokenHash.length, 64);
+  assert.equal(decryptPushToken(encrypted), token);
 });

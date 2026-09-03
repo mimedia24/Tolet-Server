@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 const Conversation = require("./models/Conversation");
+const Property = require("./models/Property");
 const User = require("./models/User");
 const { verifyAccessToken } = require("./utils/security");
 
@@ -31,6 +32,14 @@ const attachSocket = (httpServer, app, allowedOrigins) => {
       socket.join(`conversation:${conversationId}`);
       return acknowledge?.({ ok: true });
     });
+    socket.on("property:join", async (propertyId, acknowledge) => {
+      if (!/^[a-f\d]{24}$/i.test(String(propertyId))) return acknowledge?.({ok: false});
+      const allowed = await Property.exists({_id: propertyId, status: {$in: ["ACTIVE", "RESERVED", "RENTED"]}, deletedAt: null});
+      if (!allowed) return acknowledge?.({ok: false});
+      socket.join(`property:${propertyId}`);
+      return acknowledge?.({ok: true});
+    });
+    socket.on("property:leave", (propertyId) => socket.leave(`property:${propertyId}`));
   });
 
   app.set("io", io);

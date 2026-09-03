@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "cross-env NODE_ENV=test node --test --test-concurrency=1 tests/api.test.js tests/demoSeed.test.js tests/models.test.js tests/utils.test.js tests/validators.test.js",
+    "test": "cross-env NODE_ENV=test node --test --test-concurrency=1 tests/api.test.js tests/demoSeed.test.js tests/models.test.js tests/pushService.test.js tests/utils.test.js tests/validators.test.js",
     "lint": "eslint .",
     "check": "npm run lint && npm test",
     "seed": "node scripts/seed.js",
@@ -19,7 +19,9 @@
     "demo:clear": "node scripts/seed-demo.js --clear",
     "expire": "node scripts/expire-listings.js",
     "migrate:v2": "node scripts/migrate-v2.js",
-    "migrate:v2.2": "node scripts/migrate-v2-2.js"
+    "migrate:v2.2": "node scripts/migrate-v2-2.js",
+    "migrate:push": "node scripts/migrate-push.js",
+    "migrate:social": "node scripts/migrate-social.js"
   },
   "keywords": [
     "to-let",
@@ -36,6 +38,7 @@
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
     "express-rate-limit": "^8.0.1",
+    "firebase-admin": "^13.10.0",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.2",

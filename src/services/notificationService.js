@@ -1,7 +1,29 @@
 const Notification = require("../models/Notification");
+const Message = require("../models/Message");
+const {enqueueNotificationDeliveries} = require("./pushService");
 
-const createNotification = ({ userId, type, title, body, data = {} }) =>
-  Notification.create({ userId, type, title, body, data });
+const createNotification = async ({ userId, type, title, body, data = {} }) => {
+  const messageId = type === "MESSAGE" ? data?.messageId : null;
+  const senderName = String(data?.senderName || "").trim().slice(0, 100);
+  const normalizedTitle = messageId && senderName
+    ? {en: `New message from ${senderName}`, bn: `${senderName}-এর নতুন মেসেজ`}
+    : title;
+  const notification = messageId
+    ? await Notification.findOneAndUpdate(
+        {sourceKey: `MESSAGE:${messageId}`},
+        {$setOnInsert: {userId, type, title: normalizedTitle, body, data, sourceKey: `MESSAGE:${messageId}`}},
+        {new: true, upsert: true, setDefaultsOnInsert: true},
+      )
+    : await Notification.create({userId, type, title: normalizedTitle, body, data});
+  if (messageId) {
+    await enqueueNotificationDeliveries(notification);
+    await Message.updateOne(
+      {_id: messageId},
+      {$set: {notificationState: "READY", notificationLastAttemptAt: new Date()}},
+    );
+  }
+  return notification;
+};
 
 const moderationNotification = ({ userId, entityType, entityId, action, reason = "" }) => {
   const labels = {

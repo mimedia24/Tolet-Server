@@ -4,7 +4,7 @@ const { REPORT_REASONS, REPORT_STATUSES } = require("../constants/platform");
 const reportSchema = new mongoose.Schema(
   {
     reporterId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    entityType: { type: String, enum: ["PROPERTY", "JOB", "MARKET_LISTING", "USER", "MESSAGE"], required: true, index: true },
+    entityType: { type: String, enum: ["PROPERTY", "JOB", "MARKET_LISTING", "USER", "MESSAGE", "COMMENT"], required: true, index: true },
     entityId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
     reason: { type: String, enum: REPORT_REASONS, required: true },
     details: { type: String, trim: true, maxlength: 2000, default: "" },

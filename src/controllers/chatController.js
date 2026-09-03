@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const Conversation = require("../models/Conversation");
 const HousingRequest = require("../models/HousingRequest");
 const Job = require("../models/Job");
@@ -14,6 +15,8 @@ const { cleanText } = require("../utils/content");
 const { getPagination, paginationMeta } = require("../utils/query");
 const { success } = require("../utils/response");
 const { normalizeMediaUrl } = require("../utils/mediaUrl");
+const {sha256} = require("../utils/security");
+const {kickPushWorker} = require("../services/pushService");
 
 const keyFor = (a, b, contextType, contextId = "") => [String(a), String(b)].sort().join(":") + `:${contextType}:${contextId || ""}`;
 
@@ -112,10 +115,40 @@ const sendMessage = asyncHandler(async (req, res) => {
   if (attachments.some((item) => !["IMAGE", "FILE"].includes(item?.type) || typeof item?.url !== "string" || item.url.length > 1000 || !/^(https?:\/\/|\/uploads\/)/i.test(item.url))) {
     throw new ApiError(400, "VALIDATION_ERROR", "Invalid message attachment");
   }
-  const message = await Message.create({ conversationId: conversation._id, senderId: req.user._id, text, attachments, readBy: [req.user._id] });
-  conversation.lastMessageAt = message.createdAt;
-  conversation.lastMessagePreview = text.slice(0, 200);
-  await conversation.save();
+  const clientMessageId = req.validated.body.clientMessageId || crypto.randomUUID();
+  const contentHash = sha256(JSON.stringify({conversationId: String(conversation._id), text, attachments}));
+  let message = await Message.findOne({senderId: req.user._id, clientMessageId}).select("+contentHash");
+  let created = false;
+  if (message && message.contentHash !== contentHash) {
+    throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "This client message id was already used for different content");
+  }
+  if (!message) {
+    try {
+      message = await Message.create({
+        conversationId: conversation._id,
+        senderId: req.user._id,
+        clientMessageId,
+        contentHash,
+        text,
+        attachments,
+        readBy: [req.user._id],
+        notificationRequired: true,
+        notificationState: "PENDING",
+      });
+      created = true;
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      message = await Message.findOne({senderId: req.user._id, clientMessageId}).select("+contentHash");
+      if (!message || message.contentHash !== contentHash) {
+        throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "This client message id was already used for different content");
+      }
+    }
+  }
+  if (created) {
+    conversation.lastMessageAt = message.createdAt;
+    conversation.lastMessagePreview = text.slice(0, 200);
+    await conversation.save();
+  }
 
   const recipientId = conversation.participants.find((id) => String(id) !== String(req.user._id));
   const notification = await createNotification({
@@ -123,12 +156,20 @@ const sendMessage = asyncHandler(async (req, res) => {
     type: "MESSAGE",
     title: { en: "New message", bn: "নতুন মেসেজ" },
     body: { en: text.slice(0, 160), bn: text.slice(0, 160) },
-    data: { conversationId: conversation._id, messageId: message._id },
+    data: { conversationId: conversation._id, messageId: message._id, senderId: req.user._id, senderName: req.user.name || "Rentize User" },
   });
+  kickPushWorker();
   const io = req.app.get("io");
-  io?.to("user:" + recipientId).to("conversation:" + conversation._id).emit("message:new", message);
-  io?.to("user:" + recipientId).emit("notification:new", notification);
-  return success(res, { status: 201, code: "MESSAGE_SENT", data: message });
+  if (created) {
+    io?.to("user:" + recipientId).to("conversation:" + conversation._id).emit("message:new", message);
+    io?.to("user:" + recipientId).emit("notification:new", notification);
+  }
+  const data = message.toObject();
+  delete data.contentHash;
+  delete data.notificationRequired;
+  delete data.notificationState;
+  delete data.notificationLastAttemptAt;
+  return success(res, { status: created ? 201 : 200, code: "MESSAGE_SENT", data });
 });
 
 const blockConversation = asyncHandler(async (req, res) => {

@@ -13,6 +13,8 @@
 
 Background OS push while the app is completely closed additionally requires Firebase/APNs credentials and a mobile push SDK configuration. Those private credentials are intentionally not included in this source ZIP; database + realtime in-app delivery is fully wired.
 
+Chat push delivery is implemented with Firebase Cloud Messaging, encrypted per-installation tokens, idempotent client message IDs and a durable retry worker. Complete Firebase and production rollout steps are in `docs/PUSH_NOTIFICATIONS.md`.
+
 Production-oriented JavaScript/CommonJS server for the ToLet rental and direct-hire Work marketplace. It uses Node.js, Express.js, MongoDB/Mongoose, REST APIs, Socket.IO, phone OTP, JWT access tokens, rotating opaque refresh sessions, and bilingual API messages.
 
 English is the default language. Send `Accept-Language: bn` or `X-Language: bn` for Bangla system messages. Property and job content accepts both English and Bangla translations.

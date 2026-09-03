@@ -7,4 +7,6 @@ uploads/*
 coverage/
 logs/
 *.log
+firebase-service-account*.json
+secrets/
 .DS_Store

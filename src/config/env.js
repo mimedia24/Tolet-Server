@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const dotenv = require("dotenv");
 
 dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || path.resolve(process.cwd(), ".env") });
@@ -79,6 +80,14 @@ const config = {
     aiSearch: bool(process.env.ENABLE_AI_SEARCH, true),
     housingRequests: false,
     workerProfiles: bool(process.env.ENABLE_WORKER_PROFILES, true),
+    pushNotifications: bool(process.env.ENABLE_PUSH_NOTIFICATIONS, false),
+  },
+  push: {
+    firebaseServiceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "",
+    tokenEncryptionKey: process.env.PUSH_TOKEN_ENCRYPTION_KEY || "",
+    workerIntervalSeconds: number(process.env.PUSH_WORKER_INTERVAL_SECONDS, 5),
+    deliveryTtlHours: number(process.env.PUSH_DELIVERY_TTL_HOURS, 24),
+    staleDeviceDays: number(process.env.PUSH_STALE_DEVICE_DAYS, 35),
   },
   ai: {
     providerUrl: process.env.AI_PROVIDER_URL || "",
@@ -104,6 +113,19 @@ const validateProductionConfig = () => {
     errors.push("SMS_API_URL and SMS_API_KEY are required for SMS_MODE=http");
   }
   if (!config.corsOrigins.length) errors.push("CORS_ORIGINS must be configured in production");
+  if (config.features.pushNotifications && !config.push.firebaseServiceAccountPath) {
+    errors.push("FIREBASE_SERVICE_ACCOUNT_PATH is required when push notifications are enabled");
+  }
+  if (
+    config.features.pushNotifications &&
+    config.push.firebaseServiceAccountPath &&
+    !fs.existsSync(path.resolve(config.push.firebaseServiceAccountPath))
+  ) {
+    errors.push("FIREBASE_SERVICE_ACCOUNT_PATH does not exist");
+  }
+  if (config.features.pushNotifications && config.push.tokenEncryptionKey.length < 32) {
+    errors.push("PUSH_TOKEN_ENCRYPTION_KEY must be at least 32 characters when push notifications are enabled");
+  }
 
   if (errors.length) throw new Error(`Invalid production configuration: ${errors.join("; ")}`);
 };

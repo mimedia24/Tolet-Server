@@ -1,5 +1,6 @@
 const Property = require("../models/Property");
 const Favorite = require("../models/Favorite");
+const PropertyLike = require("../models/PropertyLike");
 const { getSettings } = require("../services/settingsService");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
@@ -123,18 +124,20 @@ const listProperties = asyncHandler(async (req, res) => {
   const [items, total] = filter["location.point"]
     ? [await itemsPromise, null]
     : await Promise.all([itemsPromise, Property.countDocuments(filter)]);
-  const favorites = req.user
-    ? await Favorite.find({
+  const [favorites, likes] = req.user
+    ? await Promise.all([Favorite.find({
         userId: req.user._id,
         entityType: "PROPERTY",
         entityId: {$in: items.map((item) => item._id)},
-      }).select("entityId")
-    : [];
+      }).select("entityId"), PropertyLike.find({userId: req.user._id, propertyId: {$in: items.map((item) => item._id)}}).select("propertyId")])
+    : [[], []];
   const favoriteIds = new Set(favorites.map((item) => String(item.entityId)));
+  const likedIds = new Set(likes.map((item) => String(item.propertyId)));
   return success(res, {
     data: items.map((item) => ({
       ...serialize(item, req),
       isFavorite: favoriteIds.has(String(item._id)),
+      isLiked: likedIds.has(String(item._id)),
     })),
     meta: paginationMeta({ page, limit, total }),
   });
@@ -156,7 +159,8 @@ const getProperty = asyncHandler(async (req, res) => {
     await Property.updateOne({ _id: property._id }, { $inc: { "stats.views": 1 } });
   }
   const ownerView = req.user && String(property.ownerId._id || property.ownerId) === String(req.user._id);
-  return success(res, { data: serialize(property, req, { ownerView }) });
+  const isLiked = req.user ? Boolean(await PropertyLike.exists({propertyId: property._id, userId: req.user._id})) : false;
+  return success(res, { data: {...serialize(property, req, { ownerView }), isLiked} });
 });
 
 const updateProperty = asyncHandler(async (req, res) => {

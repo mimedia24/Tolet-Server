@@ -26,6 +26,7 @@ const { authenticate } = require("../middleware/auth");
 const { requireRole } = require("../middleware/authorize");
 const validate = require("../middleware/validate");
 const { moderationSchemas } = require("../validators/schemas");
+const {deleteComment} = require("../controllers/propertySocialController");
 
 const router = express.Router();
 router.use(authenticate, requireRole("MODERATOR", "ADMIN", "SUPER_ADMIN"));
@@ -47,6 +48,7 @@ router.get("/users/:id/kyc/:side", getUserKycDocument);
 router.patch("/users/:id/role", updateUserRole);
 router.get("/reports", listReports);
 router.patch("/reports/:id", resolveReport);
+router.delete("/comments/:id", deleteComment);
 router.get("/settings", getPlatformSettings);
 router.patch("/settings", requireRole("ADMIN", "SUPER_ADMIN"), updatePlatformSettings);
 router.get("/audit-logs", requireRole("ADMIN", "SUPER_ADMIN"), listAuditLogs);

@@ -37,6 +37,11 @@ test("marketplace routes are registered", () => {
   assert.equal(routes.stack.some((layer) => String(layer.regexp).includes("market-listings")), true);
 });
 
+test("push device routes are registered", () => {
+  const routes = require("../src/routes");
+  assert.equal(routes.stack.some((layer) => String(layer.regexp).includes("devices")), true);
+});
+
 test("development CORS accepts a private-LAN phone origin", async () => {
   const response = await request(app).get("/health").set("Origin", "http://192.168.1.102:5173").expect(200);
   assert.equal(response.headers["access-control-allow-origin"], "http://192.168.1.102:5173");

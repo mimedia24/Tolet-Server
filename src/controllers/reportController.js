@@ -1,5 +1,6 @@
 const Job = require("../models/Job");
 const Message = require("../models/Message");
+const PropertyComment = require("../models/PropertyComment");
 const MarketListing = require("../models/MarketListing");
 const Property = require("../models/Property");
 const Report = require("../models/Report");
@@ -16,6 +17,7 @@ const models = {
   MARKET_LISTING: MarketListing,
   USER: User,
   MESSAGE: Message,
+  COMMENT: PropertyComment,
 };
 
 const createReport = asyncHandler(async (req, res) => {

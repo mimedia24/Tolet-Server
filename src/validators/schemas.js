@@ -312,8 +312,22 @@ const chatSchemas = {
     params: z.object({ id: objectId }),
     body: z.object({
       text: z.string().trim().min(1).max(4000),
+      clientMessageId: z.string().trim().min(8).max(100).optional(),
       attachments: z.array(z.object({ type: z.enum(["IMAGE", "FILE"]), url: z.string().max(1000) })).max(5).optional(),
     }),
+  }),
+};
+
+const deviceSchemas = {
+  registerPush: request({
+    body: z.object({
+      installationId: z.string().trim().min(8).max(200),
+      token: z.string().trim().min(20).max(4096),
+      platform: z.enum(["ANDROID", "IOS"]),
+    }),
+  }),
+  unregisterPush: request({
+    params: z.object({installationId: z.string().trim().min(8).max(200)}),
   }),
 };
 
@@ -373,9 +387,30 @@ const panoramaSchemas = {
   attach: request({ params: z.object({ id: objectId }), body: z.object({ propertyId: objectId }) }),
 };
 
+const propertySocialSchemas = {
+  propertyId: request({params: z.object({id: objectId})}),
+  commentId: request({params: z.object({id: objectId})}),
+  list: request({
+    params: z.object({id: objectId}),
+    query: z.object({cursor: objectId.optional(), limit: z.coerce.number().int().min(1).max(50).optional()}).passthrough(),
+  }),
+  listReplies: request({
+    params: z.object({id: objectId}),
+    query: z.object({cursor: objectId.optional(), limit: z.coerce.number().int().min(1).max(50).optional()}).passthrough(),
+  }),
+  create: request({
+    params: z.object({id: objectId}),
+    body: z.object({body: z.string().trim().min(1).max(1000), parentId: objectId.optional()}),
+  }),
+  update: request({
+    params: z.object({id: objectId}),
+    body: z.object({body: z.string().trim().min(1).max(1000)}),
+  }),
+};
+
 const reportSchema = request({
   body: z.object({
-    entityType: z.enum(["PROPERTY", "JOB", "MARKET_LISTING", "USER", "MESSAGE"]),
+    entityType: z.enum(["PROPERTY", "JOB", "MARKET_LISTING", "USER", "MESSAGE", "COMMENT"]),
     entityId: objectId,
     reason: z.enum(REPORT_REASONS),
     details: z.string().trim().max(2000).optional(),
@@ -385,6 +420,7 @@ const reportSchema = request({
 module.exports = {
   authSchemas,
   chatSchemas,
+  deviceSchemas,
   housingRequestSchemas,
   jobSchemas,
   marketListingSchemas,
@@ -393,6 +429,7 @@ module.exports = {
   panoramaSchemas,
   profileSchemas,
   propertySchemas,
+  propertySocialSchemas,
   reportSchema,
   request,
   workerProfileSchemas,
