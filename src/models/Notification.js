@@ -14,6 +14,9 @@ const notificationSchema = new mongoose.Schema(
       bn: { type: String, maxlength: 1000, default: "" },
     },
     data: { type: mongoose.Schema.Types.Mixed, default: {} },
+    pushRequired: {type: Boolean, default: false, index: true},
+    pushState: {type: String, enum: ["NOT_REQUIRED", "PENDING", "READY"], default: "NOT_REQUIRED", index: true},
+    pushLastAttemptAt: Date,
     readAt: Date,
   },
   { timestamps: true, versionKey: false }

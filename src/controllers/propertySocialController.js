@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const CommentLike = require("../models/CommentLike");
 const Notification = require("../models/Notification");
 const Property = require("../models/Property");
@@ -9,6 +10,7 @@ const {cleanText} = require("../utils/content");
 const {success} = require("../utils/response");
 const {enqueueNotificationDeliveries, kickPushWorker} = require("../services/pushService");
 const {audit} = require("../services/auditService");
+const {sha256} = require("../utils/security");
 
 const PUBLIC_STATUSES = ["ACTIVE", "RESERVED", "RENTED"];
 const roleCanModerate = (user) => ["MODERATOR", "ADMIN", "SUPER_ADMIN"].includes(user?.role);
@@ -60,10 +62,13 @@ const createCommentNotification = async ({recipientId, actor, propertyId, commen
         : {en: `${name} commented on your rental post`, bn: `${name} আপনার ভাড়ার পোস্টে কমেন্ট করেছেন`},
       body: {en: comment.body.slice(0, 160), bn: comment.body.slice(0, 160)},
       data: {type, propertyId: id(propertyId), commentId: id(comment._id), actorId: id(actor)},
+      pushRequired: true,
+      pushState: "PENDING",
     }},
     {new: true, upsert: true, setDefaultsOnInsert: true},
   );
   await enqueueNotificationDeliveries(notification);
+  await Notification.updateOne({_id: notification._id}, {$set: {pushState: "READY", pushLastAttemptAt: new Date()}});
   kickPushWorker();
   req.app.get("io")?.to(`user:${recipientId}`).emit("notification:new", notification);
   return notification;
@@ -81,6 +86,7 @@ const serializeComment = (comment, {user, propertyOwnerId, likedIds = new Set()}
     editedAt: value.editedAt,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    clientCommentId: value.clientCommentId,
     likeCount: value.likeCount || 0,
     replyCount: value.replyCount || 0,
     isLiked: likedIds.has(id(value._id)),
@@ -134,7 +140,7 @@ const listComments = asyncHandler(async (req, res) => {
   const page = comments.slice(0, limit);
   const liked = req.user ? await CommentLike.find({userId: req.user._id, commentId: {$in: page.map((x) => x._id)}}).select("commentId") : [];
   const likedIds = new Set(liked.map((x) => id(x.commentId)));
-  return success(res, {data: page.map((x) => serializeComment(x, {user: req.user, propertyOwnerId: property.ownerId, likedIds})), meta: {hasMore, nextCursor: hasMore ? id(page.at(-1)?._id) : null}});
+  return success(res, {data: page.map((x) => serializeComment(x, {user: req.user, propertyOwnerId: property.ownerId, likedIds})), meta: {hasMore, nextCursor: hasMore ? id(page.at(-1)?._id) : null, comments: Number(property.stats?.comments || 0)}});
 });
 
 const listReplies = asyncHandler(async (req, res) => {
@@ -159,25 +165,58 @@ const createComment = asyncHandler(async (req, res) => {
     parent = await PropertyComment.findOne({_id: req.validated.body.parentId, propertyId: property._id, parentId: null});
     if (!parent || parent.deletedAt) throw new ApiError(400, "VALIDATION_ERROR", "Replies can only target an active top-level comment");
   }
-  const comment = await PropertyComment.create({propertyId: property._id, authorId: req.user._id, parentId: parent?._id || null, body: cleanText(req.validated.body.body)});
+  const body = cleanText(req.validated.body.body);
+  const clientCommentId = req.validated.body.clientCommentId || crypto.randomUUID();
+  const contentHash = sha256(JSON.stringify({propertyId: id(property._id), parentId: id(parent?._id), body}));
+  let comment = await PropertyComment.findOne({authorId: req.user._id, clientCommentId}).select("+contentHash");
+  let created = false;
+  if (comment && comment.contentHash !== contentHash) {
+    throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "This client comment id was already used for different content");
+  }
+  if (!comment) {
+    try {
+      comment = await PropertyComment.create({
+        propertyId: property._id,
+        authorId: req.user._id,
+        parentId: parent?._id || null,
+        body,
+        clientCommentId,
+        contentHash,
+      });
+      created = true;
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      comment = await PropertyComment.findOne({authorId: req.user._id, clientCommentId}).select("+contentHash");
+      if (!comment || comment.contentHash !== contentHash) {
+        throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "This client comment id was already used for different content");
+      }
+    }
+  }
   const [commentCount, replyCount] = await Promise.all([
     PropertyComment.countDocuments({propertyId: property._id, deletedAt: null}),
     parent ? PropertyComment.countDocuments({parentId: parent._id, deletedAt: null}) : Promise.resolve(0),
   ]);
-  await Promise.all([
-    Property.updateOne({_id: property._id}, {$set: {"stats.comments": commentCount}}),
-    parent ? PropertyComment.updateOne({_id: parent._id}, {$set: {replyCount}}) : Promise.resolve(),
-  ]);
+  if (created) await Promise.all([
+      Property.updateOne({_id: property._id}, {$set: {"stats.comments": commentCount}}),
+      parent ? PropertyComment.updateOne({_id: parent._id}, {$set: {replyCount}}) : Promise.resolve(),
+    ]);
   await comment.populate("authorId", "name avatarUrl verification.identityStatus");
-  const recipients = new Set([id(property.ownerId)]);
-  if (parent) recipients.add(id(parent.authorId));
-  recipients.delete(id(req.user));
-  for (const recipientId of recipients) {
-    await createCommentNotification({recipientId, actor: req.user, propertyId: property._id, comment, type: parent ? "PROPERTY_REPLY" : "PROPERTY_COMMENT", req});
+  if (created) {
+    const recipients = new Set([id(property.ownerId)]);
+    if (parent) recipients.add(id(parent.authorId));
+    recipients.delete(id(req.user));
+    for (const recipientId of recipients) {
+      await createCommentNotification({recipientId, actor: req.user, propertyId: property._id, comment, type: parent ? "PROPERTY_REPLY" : "PROPERTY_COMMENT", req});
+    }
   }
   const data = serializeComment(comment, {user: req.user, propertyOwnerId: property.ownerId});
-  emitSocial(req, property._id, parent ? "property:reply:new" : "property:comment:new", data);
-  return success(res, {status: 201, code: "COMMENT_CREATED", data});
+  if (created) emitSocial(req, property._id, parent ? "property:reply:new" : "property:comment:new", data);
+  return success(res, {
+    status: created ? 201 : 200,
+    code: created ? "COMMENT_CREATED" : "COMMENT_EXISTS",
+    data,
+    meta: {comments: commentCount},
+  });
 });
 
 const updateComment = asyncHandler(async (req, res) => {
@@ -217,7 +256,7 @@ const deleteComment = asyncHandler(async (req, res) => {
     comment.parentId ? PropertyComment.updateOne({_id: comment.parentId}, {$set: {replyCount}}) : Promise.resolve(),
   ]);
   emitSocial(req, property._id, "property:comment:delete", {propertyId: id(property._id), commentId: id(comment._id), parentId: id(comment.parentId)});
-  return success(res, {code: "COMMENT_DELETED"});
+  return success(res, {code: "COMMENT_DELETED", meta: {comments: commentCount}});
 });
 
 const likeComment = asyncHandler(async (req, res) => {

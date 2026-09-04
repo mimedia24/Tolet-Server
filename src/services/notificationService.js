@@ -2,21 +2,36 @@ const Notification = require("../models/Notification");
 const Message = require("../models/Message");
 const {enqueueNotificationDeliveries} = require("./pushService");
 
-const createNotification = async ({ userId, type, title, body, data = {} }) => {
+const createNotification = async ({ userId, type, title, body, data = {}, sourceKey, push = false }) => {
   const messageId = type === "MESSAGE" ? data?.messageId : null;
   const senderName = String(data?.senderName || "").trim().slice(0, 100);
   const normalizedTitle = messageId && senderName
     ? {en: `New message from ${senderName}`, bn: `${senderName}-এর নতুন মেসেজ`}
     : title;
-  const notification = messageId
+  const effectiveSourceKey = sourceKey || (messageId ? `MESSAGE:${messageId}` : null);
+  const notification = effectiveSourceKey
     ? await Notification.findOneAndUpdate(
-        {sourceKey: `MESSAGE:${messageId}`},
-        {$setOnInsert: {userId, type, title: normalizedTitle, body, data, sourceKey: `MESSAGE:${messageId}`}},
+        {sourceKey: effectiveSourceKey},
+        {$setOnInsert: {
+          userId, type, title: normalizedTitle, body, data, sourceKey: effectiveSourceKey,
+          pushRequired: push || Boolean(messageId),
+          pushState: push || messageId ? "PENDING" : "NOT_REQUIRED",
+        }},
         {new: true, upsert: true, setDefaultsOnInsert: true},
       )
-    : await Notification.create({userId, type, title: normalizedTitle, body, data});
-  if (messageId) {
+    : await Notification.create({
+        userId, type, title: normalizedTitle, body, data,
+        pushRequired: push,
+        pushState: push ? "PENDING" : "NOT_REQUIRED",
+      });
+  if (notification.pushRequired || push || messageId) {
     await enqueueNotificationDeliveries(notification);
+    await Notification.updateOne(
+      {_id: notification._id},
+      {$set: {pushState: "READY", pushLastAttemptAt: new Date()}},
+    );
+  }
+  if (messageId) {
     await Message.updateOne(
       {_id: messageId},
       {$set: {notificationState: "READY", notificationLastAttemptAt: new Date()}},

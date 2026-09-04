@@ -124,7 +124,7 @@ const propertyBase = {
     bathrooms: z.number().int().min(0).max(100).optional(),
     kitchens: z.number().int().min(0).max(20).optional(),
     balconies: z.number().int().min(0).max(50).optional(),
-    sizeSqft: z.number().min(1).max(10000000),
+    sizeSqft: z.number().min(1).max(10000000).optional(),
     floor: z.number().int().min(-10).max(300).optional(),
     totalFloors: z.number().int().min(0).max(300).optional(),
     minimumStayMonths: z.number().int().min(0).max(120).optional(),
@@ -154,7 +154,13 @@ const propertySchemas = {
     }),
   }),
   update: request({ body: z.object(Object.fromEntries(Object.entries(propertyBase).map(([key, value]) => [key, value.optional()]))) , params: z.object({ id: objectId }) }),
-  byId: request({ params: z.object({ id: objectId }) }),
+  byId: request({
+    params: z.object({ id: objectId }),
+    query: z.object({
+      cursor: objectId.optional(),
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+    }).passthrough(),
+  }),
   ownerStatus: request({ body: z.object({ status: z.enum(["ACTIVE", "RESERVED", "RENTED"]), note: z.string().trim().max(500).optional() }), params: z.object({ id: objectId }) }),
 };
 
@@ -400,7 +406,11 @@ const propertySocialSchemas = {
   }),
   create: request({
     params: z.object({id: objectId}),
-    body: z.object({body: z.string().trim().min(1).max(1000), parentId: objectId.optional()}),
+    body: z.object({
+      body: z.string().trim().min(1).max(1000),
+      parentId: objectId.optional(),
+      clientCommentId: z.string().trim().min(8).max(100).optional(),
+    }),
   }),
   update: request({
     params: z.object({id: objectId}),

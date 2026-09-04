@@ -34,7 +34,7 @@ const propertySchema = new mongoose.Schema(
       bathrooms: { type: Number, min: 0, max: 100 },
       kitchens: { type: Number, min: 0, max: 20 },
       balconies: { type: Number, min: 0, max: 50 },
-      sizeSqft: { type: Number, required: true, min: 1, max: 10000000, index: true },
+      sizeSqft: { type: Number, min: 1, max: 10000000, index: true },
       floor: { type: Number, min: -10, max: 300 },
       totalFloors: { type: Number, min: 0, max: 300 },
       minimumStayMonths: { type: Number, min: 0, max: 120 },

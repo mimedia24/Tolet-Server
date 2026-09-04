@@ -6,6 +6,7 @@ const { processNext } = require("./services/panoramaStitchService");
 const {
   processPendingPushDeliveries,
   pruneStaleDeviceRegistrations,
+  reconcileNotificationDeliveries,
   reconcileMessageNotifications,
 } = require("./services/pushService");
 
@@ -31,6 +32,7 @@ const startScheduler = () => {
   tasks.push(cron.schedule(`*/${Math.floor(Math.max(1, Math.min(59, config.push.workerIntervalSeconds)))} * * * * *`, async () => {
     try {
       await reconcileMessageNotifications();
+      await reconcileNotificationDeliveries();
       await processPendingPushDeliveries();
     } catch (error) {
       logger.error({err: error}, "Push notification worker failed");

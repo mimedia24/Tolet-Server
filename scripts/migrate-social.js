@@ -14,6 +14,22 @@ async function run() {
     Property.updateMany({"stats.likes": {$exists: false}}, {$set: {"stats.likes": 0}}),
     Property.updateMany({"stats.comments": {$exists: false}}, {$set: {"stats.comments": 0}}),
   ]);
+  const [likes, comments] = await Promise.all([
+    PropertyLike.aggregate([{$group: {_id: "$propertyId", count: {$sum: 1}}}]),
+    PropertyComment.aggregate([{$match: {deletedAt: null}}, {$group: {_id: "$propertyId", count: {$sum: 1}}}]),
+  ]);
+  const likeMap = new Map(likes.map((row) => [String(row._id), row.count]));
+  const commentMap = new Map(comments.map((row) => [String(row._id), row.count]));
+  const properties = await Property.find({}).select("_id").lean();
+  if (properties.length) await Property.bulkWrite(properties.map((property) => ({
+    updateOne: {
+      filter: {_id: property._id},
+      update: {$set: {
+        "stats.likes": likeMap.get(String(property._id)) || 0,
+        "stats.comments": commentMap.get(String(property._id)) || 0,
+      }},
+    },
+  })));
   console.log("Property social indexes and counters are ready.");
   await mongoose.disconnect();
 }

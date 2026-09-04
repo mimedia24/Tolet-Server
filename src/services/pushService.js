@@ -127,6 +127,28 @@ const reconcileMessageNotifications = async (limit = 100) => {
   return repaired;
 };
 
+const reconcileNotificationDeliveries = async (limit = 100) => {
+  if (!config.features.pushNotifications) return 0;
+  const cutoff = new Date(Date.now() - config.push.deliveryTtlHours * 60 * 60 * 1000);
+  const pending = await Notification.find({
+    pushRequired: true,
+    createdAt: {$gt: cutoff},
+    pushState: {$ne: "READY"},
+  }).sort({createdAt: 1}).limit(limit);
+  let repaired = 0;
+  for (const notification of pending) {
+    try {
+      await Notification.updateOne({_id: notification._id}, {$set: {pushLastAttemptAt: new Date()}});
+      await enqueueNotificationDeliveries(notification);
+      await Notification.updateOne({_id: notification._id}, {$set: {pushState: "READY"}});
+      repaired += 1;
+    } catch (error) {
+      logger.error({err: error, notificationId: String(notification._id)}, "Notification delivery reconciliation failed");
+    }
+  }
+  return repaired;
+};
+
 const claimNextDelivery = () => {
   const now = new Date();
   return PushDelivery.findOneAndUpdate(
@@ -271,6 +293,7 @@ module.exports = {
   kickPushWorker,
   processPendingPushDeliveries,
   pruneStaleDeviceRegistrations,
+  reconcileNotificationDeliveries,
   reconcileMessageNotifications,
   sendClaimedDelivery,
   setMessagingClientForTests: (client) => {

@@ -17,6 +17,8 @@ const markUnconfirmedProperties = async (now) => {
       title: { en: "Is your rental still available?", bn: "আপনার ভাড়ার পোস্ট কি এখনো Available?" },
       body: { en: "The listing was marked Not sure because it was not updated for 7 days. Confirm availability to restore the Available badge.", bn: "৭ দিন আপডেট না করায় পোস্টটি Not sure করা হয়েছে। Available ব্যাজ ফেরাতে availability নিশ্চিত করুন।" },
       data: { propertyId: property._id, availabilityStatus: "NOT_SURE" },
+      sourceKey: `PROPERTY_AVAILABILITY_CONFIRMATION:${property._id}:${now.toISOString().slice(0, 10)}`,
+      push: true,
     });
   }));
   return items.length;

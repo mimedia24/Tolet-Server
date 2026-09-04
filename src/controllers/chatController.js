@@ -86,10 +86,17 @@ const ensureParticipant = async (conversationId, userId, requireUnblocked = fals
 
 const listMessages = asyncHandler(async (req, res) => {
   const conversation = await ensureParticipant(req.params.id, req.user._id);
-  const { page, limit, skip } = getPagination(req.query);
+  const limit = Math.min(Number(req.validated?.query?.limit || 30), 100);
   const filter = { conversationId: req.params.id, deletedAt: null };
-  const [items, total] = await Promise.all([Message.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit), Message.countDocuments(filter)]);
-  await Message.updateMany({ conversationId: req.params.id, senderId: { $ne: req.user._id }, readBy: { $ne: req.user._id } }, { $addToSet: { readBy: req.user._id } });
+  if (req.validated?.query?.cursor) filter._id = {$lt: req.validated.query.cursor};
+  const items = await Message.find(filter).sort({_id: -1}).limit(limit + 1);
+  const hasMore = items.length > limit;
+  const page = items.slice(0, limit);
+  const readAt = new Date();
+  await Message.updateMany(
+    { conversationId: req.params.id, senderId: { $ne: req.user._id }, readBy: { $ne: req.user._id } },
+    { $addToSet: { readBy: req.user._id }, $set: {readAt, deliveredAt: readAt} },
+  );
   await Notification.updateMany(
     {
       userId: req.user._id,
@@ -102,9 +109,12 @@ const listMessages = asyncHandler(async (req, res) => {
   req.app.get("io")?.to(`conversation:${req.params.id}`).emit("message:read", {
     conversationId: req.params.id,
     userId: req.user._id,
-    readAt: new Date(),
+    readAt,
   });
-  return success(res, { data: items.reverse(), meta: paginationMeta({ page, limit, total }) });
+  return success(res, {
+    data: page.reverse(),
+    meta: {hasMore, nextCursor: hasMore ? String(page[0]?._id || "") : null},
+  });
 });
 
 const sendMessage = asyncHandler(async (req, res) => {
@@ -156,7 +166,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     type: "MESSAGE",
     title: { en: "New message", bn: "নতুন মেসেজ" },
     body: { en: text.slice(0, 160), bn: text.slice(0, 160) },
-    data: { conversationId: conversation._id, messageId: message._id, senderId: req.user._id, senderName: req.user.name || "Rentize User" },
+    data: { type: "MESSAGE", conversationId: conversation._id, messageId: message._id, senderId: req.user._id, senderName: req.user.name || "Rentize User" },
   });
   kickPushWorker();
   const io = req.app.get("io");

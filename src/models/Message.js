@@ -14,6 +14,8 @@ const messageSchema = new mongoose.Schema(
       },
     ],
     readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    deliveredAt: Date,
+    readAt: Date,
     notificationRequired: {type: Boolean, default: false, index: true},
     notificationState: {type: String, enum: ["PENDING", "READY"], default: "PENDING", index: true},
     notificationLastAttemptAt: Date,
