@@ -5,7 +5,7 @@ const MarketListing = require("../models/MarketListing");
 const { createNotification } = require("./notificationService");
 
 const markUnconfirmedProperties = async (now) => {
-  const items = await Property.find({ status: "ACTIVE", availabilityStatus: "AVAILABLE", freshnessDueAt: { $lte: now }, expiresAt: { $gt: now }, deletedAt: null }).select("ownerId status availabilityStatus statusHistory");
+  const items = await Property.find({ status: "ACTIVE", availabilityStatus: "AVAILABLE", freshnessDueAt: { $lte: now }, expiresAt: { $gt: now }, deletedAt: null }).select("ownerId status kind category availabilityStatus statusHistory");
   await Promise.all(items.map(async (property) => {
     property.availabilityStatus = "NOT_SURE";
     property.freshnessReminderSentAt = now;
