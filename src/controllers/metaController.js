@@ -43,7 +43,7 @@ const withLabels = (items) => items.map((value) => ({ value, label: labels[value
 const getMetadata = asyncHandler(async (_req, res) => {
   const settings = await getSettings();
   const featureFlags = settings.featureFlags.toObject();
-  for (const feature of ["chat", "visitBooking", "tour360", "aiSearch", "housingRequests", "workerProfiles"]) featureFlags[feature] = Boolean(featureFlags[feature] && config.features[feature]);
+  for (const feature of ["chat", "visitBooking", "tour360", "aiSearch", "housingRequests", "workerProfiles", "kyc"]) featureFlags[feature] = Boolean(featureFlags[feature] && config.features[feature]);
   featureFlags.housingRequests = false;
   return success(res, {
     data: {
@@ -52,12 +52,13 @@ const getMetadata = asyncHandler(async (_req, res) => {
       districts: BANGLADESH_DISTRICTS.map((district) => ({ value: district.value, division: district.division, label: { en: district.value, bn: district.bn } })),
       residentialCategories: withLabels(RESIDENTIAL_CATEGORIES),
       commercialCategories: withLabels(COMMERCIAL_CATEGORIES),
-      jobCategories: withLabels(settings.jobCategories.length ? settings.jobCategories : JOB_CATEGORIES),
+      jobCategories: withLabels([...new Set([...(settings.jobCategories.length ? settings.jobCategories : JOB_CATEGORIES), "OTHER"])]),
       marketCategories: withLabels(settings.marketCategories.length ? settings.marketCategories : MARKET_CATEGORIES),
       jobTypes: withLabels(JOB_TYPES),
       amenities: withLabels(settings.amenities.length ? settings.amenities : PROPERTY_AMENITIES),
       tenantTypes: withLabels(TENANT_TYPES),
       featureFlags,
+      features: featureFlags,
       limits: {
         maxPropertyImages: settings.maxPropertyImages,
         maxMarketImages: settings.maxMarketImages,

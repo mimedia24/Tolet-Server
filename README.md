@@ -218,4 +218,6 @@ The script refuses to write to `NODE_ENV=production` unless `ALLOW_DEMO_SEED=tru
 
 ## বাংলা সংক্ষিপ্ত নির্দেশনা
 
+KYC সাময়িকভাবে বন্ধ রাখতে `ENABLE_KYC=false` এবং account deletion-এর grace period-এর জন্য `ACCOUNT_DELETION_GRACE_DAYS=3` দিন। KYC বন্ধ করলেও পুরোনো KYC record/file মুছে যায় না; নির্ধারিত account purge-এর সময় সংশ্লিষ্ট file মুছে যায়।
+
 `.env.example` কপি করে `.env` তৈরি করুন, MongoDB ও SMS API তথ্য বসান, তারপর `npm install`, `npm run seed`, এবং `npm start` চালান। API-এর ডিফল্ট ভাষা ইংরেজি। বাংলা message পেতে request header-এ `X-Language: bn` দিন। Production-এ `SMS_MODE=console` ব্যবহার করা যাবে না।

@@ -31,6 +31,8 @@ const userSchema = new mongoose.Schema(
     lockedUntil: { type: Date, select: false },
     passwordChangedAt: Date,
     tokenVersion: { type: Number, default: 0, select: false },
+    deletionRequestedAt: { type: Date, default: null },
+    deletionScheduledFor: { type: Date, default: null, index: true },
   },
   { timestamps: true, versionKey: false }
 );

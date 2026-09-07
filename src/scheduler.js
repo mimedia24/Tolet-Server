@@ -3,6 +3,7 @@ const {config} = require("./config/env");
 const logger = require("./config/logger");
 const { expireListings } = require("./services/expiryService");
 const { processNext } = require("./services/panoramaStitchService");
+const {processDueAccountDeletions} = require("./services/accountDeletionService");
 const {
   processPendingPushDeliveries,
   pruneStaleDeviceRegistrations,
@@ -45,6 +46,15 @@ const startScheduler = () => {
       if (result.modifiedCount) logger.info({disabledDevices: result.modifiedCount}, "Stale push devices disabled");
     } catch (error) {
       logger.error({err: error}, "Stale push device cleanup failed");
+    }
+  }));
+
+  tasks.push(cron.schedule("7 * * * *", async () => {
+    try {
+      const result = await processDueAccountDeletions();
+      if (result.deleted) logger.info({deletedAccounts: result.deleted}, "Scheduled account deletion completed");
+    } catch (error) {
+      logger.error({err: error}, "Scheduled account deletion failed");
     }
   }));
 

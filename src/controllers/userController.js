@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const bcrypt = require("bcryptjs");
 const Job = require("../models/Job");
 const JobApplication = require("../models/JobApplication");
 const MarketListing = require("../models/MarketListing");
@@ -11,6 +12,7 @@ const { createNotification } = require("../services/notificationService");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { success } = require("../utils/response");
+const {cancelDeletion, scheduleDeletion} = require("../services/accountDeletionService");
 
 const getMe = asyncHandler(async (req, res) => {
   const [properties, jobs, applications, marketListings] = await Promise.all([
@@ -72,10 +74,35 @@ const updateAvatar = asyncHandler(async (req, res) => {
   return success(res, { code: "AVATAR_UPDATED", data: publicUser(req.user) });
 });
 
+const getDeletionStatus = asyncHandler(async (req, res) => success(res, {
+  data: {
+    status: req.user.accountStatus,
+    deletionRequestedAt: req.user.deletionRequestedAt,
+    deletionScheduledFor: req.user.deletionScheduledFor,
+  },
+}));
+
+const requestAccountDeletion = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select("+passwordHash +tokenVersion");
+  if (!user?.passwordHash || !(await bcrypt.compare(req.validated.body.password, user.passwordHash))) {
+    throw new ApiError(401, "INVALID_CREDENTIALS", "Password confirmation failed");
+  }
+  await scheduleDeletion(user);
+  return success(res, {
+    code: "ACCOUNT_DELETION_SCHEDULED",
+    data: {deletionScheduledFor: user.deletionScheduledFor},
+  });
+});
+
+const cancelAccountDeletion = asyncHandler(async (req, res) => {
+  await cancelDeletion(req.user);
+  return success(res, {code: "ACCOUNT_DELETION_CANCELLED", data: publicUser(req.user)});
+});
+
 const getPublicUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id).select("name avatarUrl role verification.identityStatus createdAt accountStatus");
   if (!user || user.accountStatus !== "ACTIVE") throw new ApiError(404, "NOT_FOUND");
   return success(res, { data: user });
 });
 
-module.exports = { getMe, getPublicUser, submitKyc, updateAvatar, updateCapabilities, updateMe };
+module.exports = {cancelAccountDeletion, getDeletionStatus, getMe, getPublicUser, requestAccountDeletion, submitKyc, updateAvatar, updateCapabilities, updateMe};

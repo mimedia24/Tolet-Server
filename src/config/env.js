@@ -80,8 +80,10 @@ const config = {
     aiSearch: bool(process.env.ENABLE_AI_SEARCH, true),
     housingRequests: false,
     workerProfiles: bool(process.env.ENABLE_WORKER_PROFILES, true),
+    kyc: bool(process.env.ENABLE_KYC, false),
     pushNotifications: bool(process.env.ENABLE_PUSH_NOTIFICATIONS, false),
   },
+  accountDeletionGraceDays: number(process.env.ACCOUNT_DELETION_GRACE_DAYS, 3),
   push: {
     firebaseServiceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "",
     tokenEncryptionKey: process.env.PUSH_TOKEN_ENCRYPTION_KEY || "",

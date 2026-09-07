@@ -31,6 +31,11 @@ const marketListingSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0, max: 1000000000, index: true },
     negotiable: { type: Boolean, default: false },
     district: { type: String, enum: DISTRICT_VALUES, required: true, index: true },
+    location: {
+      address: {type: String, trim: true, maxlength: 300, default: ""},
+      latitude: {type: Number, min: -90, max: 90},
+      longitude: {type: Number, min: -180, max: 180},
+    },
     media: {
       type: [mediaSchema],
       validate: [(value) => value.length <= 8, "Maximum 8 marketplace images"],

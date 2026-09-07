@@ -1,5 +1,7 @@
 const express = require("express");
 const {
+  requestAccountDeletionCancelOtp,
+  requestAccountDeletionOtp,
   forgotPassword,
   login,
   logout,
@@ -11,6 +13,8 @@ const {
   resendRegistrationOtp,
   resetPassword,
   verifyOtp,
+  verifyAccountDeletionCancelOtp,
+  verifyAccountDeletionOtp,
 } = require("../controllers/authController");
 const { authenticate } = require("../middleware/auth");
 const { loginLimiter, otpRequestLimiter, otpVerifyLimiter } = require("../middleware/rateLimits");
@@ -30,5 +34,9 @@ router.post("/otp/verify", otpVerifyLimiter, validate(authSchemas.verifyOtp), ve
 router.post("/refresh", validate(authSchemas.refresh), refresh);
 router.post("/logout", validate(authSchemas.logout), logout);
 router.post("/logout-all", authenticate, logoutAll);
+router.post("/account-deletion/request-otp", otpRequestLimiter, validate(authSchemas.phoneOnly), requestAccountDeletionOtp);
+router.post("/account-deletion/verify", otpVerifyLimiter, validate(authSchemas.accountDeletionVerify), verifyAccountDeletionOtp);
+router.post("/account-deletion/cancel/request-otp", otpRequestLimiter, validate(authSchemas.phoneOnly), requestAccountDeletionCancelOtp);
+router.post("/account-deletion/cancel/verify", otpVerifyLimiter, validate(authSchemas.accountDeletionVerify), verifyAccountDeletionCancelOtp);
 
 module.exports = router;

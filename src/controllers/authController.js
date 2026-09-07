@@ -10,6 +10,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { normalizeBangladeshPhone } = require("../utils/phone");
 const { success } = require("../utils/response");
 const { generateOtp, hashOtp, sha256 } = require("../utils/security");
+const {cancelDeletion, scheduleDeletion} = require("../services/accountDeletionService");
 
 const otpContext = (req) => ({
   requestIp: req.ip,
@@ -64,6 +65,7 @@ const registerStart = asyncHandler(async (req, res) => {
     throw new ApiError(409, "CONFLICT", "An active account already exists for this phone number");
   }
   if (user?.accountStatus === "SUSPENDED") throw new ApiError(403, "ACCOUNT_SUSPENDED");
+  if (user?.accountStatus === "DELETION_PENDING") throw new ApiError(409, "ACCOUNT_DELETION_PENDING", "Cancel the pending deletion before using this account");
 
   const passwordHash = await bcrypt.hash(password, 12);
   if (!user) {
@@ -119,6 +121,9 @@ const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ phone }).select("+passwordHash +failedLoginAttempts +lockedUntil +tokenVersion");
   if (!user) throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone number or password");
   if (user.accountStatus === "SUSPENDED") throw new ApiError(403, "ACCOUNT_SUSPENDED");
+  if (user.accountStatus === "DELETION_PENDING") {
+    throw new ApiError(409, "ACCOUNT_DELETION_PENDING", "This account is scheduled for deletion", {deletionScheduledFor: user.deletionScheduledFor});
+  }
   if (!user.phoneVerified || user.accountStatus === "PENDING_VERIFICATION") {
     throw new ApiError(403, "PHONE_VERIFICATION_REQUIRED", "Verify your phone number before signing in");
   }
@@ -204,7 +209,41 @@ const logoutAll = asyncHandler(async (req, res) => {
   return success(res, { code: "LOGOUT_SUCCESS" });
 });
 
+const requestAccountDeletionOtp = asyncHandler(async (req, res) => {
+  const phone = normalizeBangladeshPhone(req.validated.body.phone);
+  const user = await User.findOne({phone, phoneVerified: true, accountStatus: "ACTIVE"});
+  if (user) await issueOtp({phone, purpose: "ACCOUNT_DELETION", req, language: res.locals.language});
+  return success(res, {code: "ACCOUNT_DELETION_OTP_SENT", data: {phone, expiresInSeconds: config.otpExpiresMinutes * 60}});
+});
+
+const verifyAccountDeletionOtp = asyncHandler(async (req, res) => {
+  const phone = normalizeBangladeshPhone(req.validated.body.phone);
+  await consumeOtp({phone, purpose: "ACCOUNT_DELETION", otp: req.validated.body.otp});
+  const user = await User.findOne({phone, phoneVerified: true, accountStatus: "ACTIVE"}).select("+tokenVersion");
+  if (!user) throw new ApiError(404, "NOT_FOUND");
+  await scheduleDeletion(user);
+  return success(res, {code: "ACCOUNT_DELETION_SCHEDULED", data: {deletionScheduledFor: user.deletionScheduledFor}});
+});
+
+const requestAccountDeletionCancelOtp = asyncHandler(async (req, res) => {
+  const phone = normalizeBangladeshPhone(req.validated.body.phone);
+  const user = await User.findOne({phone, phoneVerified: true, accountStatus: "DELETION_PENDING"});
+  if (user) await issueOtp({phone, purpose: "ACCOUNT_DELETION_CANCEL", req, language: res.locals.language});
+  return success(res, {code: "ACCOUNT_DELETION_CANCEL_OTP_SENT", data: {phone, expiresInSeconds: config.otpExpiresMinutes * 60}});
+});
+
+const verifyAccountDeletionCancelOtp = asyncHandler(async (req, res) => {
+  const phone = normalizeBangladeshPhone(req.validated.body.phone);
+  await consumeOtp({phone, purpose: "ACCOUNT_DELETION_CANCEL", otp: req.validated.body.otp});
+  const user = await User.findOne({phone, phoneVerified: true, accountStatus: "DELETION_PENDING"});
+  if (!user) throw new ApiError(404, "NOT_FOUND");
+  await cancelDeletion(user);
+  return success(res, {code: "ACCOUNT_DELETION_CANCELLED"});
+});
+
 module.exports = {
+  requestAccountDeletionCancelOtp,
+  requestAccountDeletionOtp,
   forgotPassword,
   login,
   logout,
@@ -216,4 +255,6 @@ module.exports = {
   resendRegistrationOtp,
   resetPassword,
   verifyOtp,
+  verifyAccountDeletionCancelOtp,
+  verifyAccountDeletionOtp,
 };

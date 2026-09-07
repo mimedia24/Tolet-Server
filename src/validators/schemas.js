@@ -77,6 +77,7 @@ const authSchemas = {
   }),
   refresh: request({ body: z.object({ refreshToken: z.string().min(40).max(500) }) }),
   logout: request({ body: z.object({ refreshToken: z.string().min(40).max(500) }) }),
+  accountDeletionVerify: request({body: z.object({phone: z.string().min(10).max(20), otp: z.string().regex(/^\d{6}$/)})}),
 };
 
 const profileSchemas = {
@@ -98,6 +99,7 @@ const profileSchemas = {
     }),
   }),
   updateAvatar: request({ body: z.object({ cameraFile: z.string().trim().min(1).max(300) }) }),
+  requestDeletion: request({body: z.object({password: z.string().min(1).max(128)})}),
 };
 
 const propertyBase = {
@@ -150,6 +152,8 @@ const propertySchemas = {
     body: z.object(propertyBase).superRefine((value, context) => {
       const valid = value.kind === "RESIDENTIAL" ? RESIDENTIAL_CATEGORIES.includes(value.category) : COMMERCIAL_CATEGORIES.includes(value.category);
       if (!valid) context.addIssue({ code: "custom", path: ["category"], message: "Category does not match property kind" });
+      if (value.kind === "RESIDENTIAL" && value.attributes.bedrooms === undefined) context.addIssue({ code: "custom", path: ["attributes", "bedrooms"], message: "Bedroom count is required for residential listings" });
+      if (value.kind === "RESIDENTIAL" && value.attributes.bathrooms === undefined) context.addIssue({ code: "custom", path: ["attributes", "bathrooms"], message: "Bathroom count is required for residential listings" });
       if (value.kind === "RESIDENTIAL" && value.attributes.kitchens === undefined) context.addIssue({ code: "custom", path: ["attributes", "kitchens"], message: "Kitchen count is required for residential listings" });
     }),
   }),
@@ -171,6 +175,11 @@ const marketBase = {
   price: z.number().min(0).max(1000000000),
   negotiable: z.boolean().optional(),
   district: z.enum(DISTRICT_VALUES),
+  location: z.object({
+    address: z.string().trim().min(5).max(300),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+  }).optional(),
   media: z.array(media).min(1).max(8),
   attributes: z.object({
     brand: z.string().trim().max(80).optional(),
